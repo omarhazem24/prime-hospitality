@@ -1,0 +1,876 @@
+﻿How to Use the Kwentra Individual Reservation API 
+
+1. Overview
+Parameter
+Example
+Explanation
+tenant_id
+394
+Specifies which tenant (hotel/property) to query.
+include[]=name.first_name
+name.first_name
+Requests the guest’s first name in the response.
+include[]=name.last_name
+name.last_name
+Requests the guest’s last name in the response.
+include[]=name.name
+name.name
+Requests the guest’s full name (as a single string) in the response.
+include[]=name.guest_preferences
+name.guest_preferences
+Requests the guest’s preferences or notes.
+include[]=check_in_time
+check_in_time
+Requests the check-in time for each reservation.
+include[]=check_out_time
+check_out_time
+Requests the check-out time for each reservation.
+include[]=channel.name
+channel.name
+Requests the name of the booking channel (e.g., “Individual,” “OTA”).
+include[]=country
+country
+Requests the country information (ID and ISO code).
+include[]=market
+market
+Requests the market segment (if any).
+include[]=source
+source
+Requests the reservation source (ID), indicating how it was booked (direct, OTA, etc.).
+include[]=group_reservation.name
+group_reservation.name
+Requests the name of the group reservation (if applicable).
+include[]=group_reservation.confirmation_number
+group_reservation.confirmation_number
+Requests the group reservation’s confirmation number (if part of a group).
+include[]=state.name
+state.name
+Requests the textual name of the reservation’s state (e.g., “Expected,” “Checked In”).
+include[]=current_room_night.room_number
+current_room_night.room_number
+Requests the assigned room number for the current room night (if any).
+include[]=current_room_night.actual_room_type.room_type
+current_room_night.actual_room_type.room_type
+Requests the actual room type (e.g., “Double Deluxe”) for the reservation.
+sort[]
+-id
+Sorts the results by id in descending order (remove the dash for ascending).
+filter{state.name.regex}
+Checked%20In|Checked%20Out|No%20Show|Expected|Canceled
+Filters by reservation state. Only reservations whose state name matches any of these values will be returned.
+filter{arrival_date.gte}
+2024-05-06
+Filters reservations whose arrival_date is on or after this date (YYYY-MM-DD).
+filter{arrival_date.lte}
+2024-05-08
+Filters reservations whose arrival_date is on or before this date (YYYY-MM-DD).
+include[]: current_room_night.number_of_adults
+include[]: current_room_night.number_of_children
+
+ "number_of_adults": 1,
+ "number_of_children": 0,
+
+Returns number of adults and children in the current night 
+include[]: room_nights.board_type.description
+AI, BB, Bed and Breakfast
+Returns board type or meal plan description
+Kwentra Individual Reservation API provides reservation information for a specific hotel or property). 
+
+2. Example Request
+
+curl --request GET \
+ --url 'https://manage.kwentra.com/api/reservation/individualreservation/v2?tenant_id=394&include%5B%5D=name.first_name&include%5B%5D=name.last_name&include%5B%5D=name.name&include%5B%5D=check_in_time&include%5B%5D=check_out_time&include%5B%5D=channel.name&include%5B%5D=country&include%5B%5D=market&include%5B%5D=source&include%5B%5D=group_reservation.name&include%5B%5D=group_reservation.confirmation_number&include%5B%5D=state.name&include%5B%5D=current_room_night.room_number&include%5B%5D=current_room_night.actual_room_type.room_type&include%5B%5D=room_nights.board_type.description&include%5B%5D=current_room_night.number_of_adults&include%5B%5D=current_room_night.number_of_children&include%5B%5D=room_nights.board_type.description&sort%5B%5D=-id&filter%7Bstate.name.regex%7D=Checked%20In%7CChecked%20Out%7CNo%20Show%7CExpected%7CCanceled&filter%7Barrival_date.gte%7D=2024-05-06&filter%7Barrival_date.lte%7D=2024-05-08' \
+ --header 'Authorization: Basic VGVzdFVzZXI6VGVzdFVzZXIuMTIz' \
+ --header 'accept: application/json, text/plain, */*' \
+
+
+
+3. Parameter Explanation 
+Below is a summary of the main query parameters you can use when making this GET request.
+
+3.1 Request Headers
+Authentication: Basic
+URL: https://manage.kwentra.com/?tenant_id=XXXX 
+UserName: Your Kwentra's Username
+Password: Your Kwentra's password
+
+4. Example Response
+Below is a truncated JSON response showing two reservations (IDs 15646 and 15645). The actual response might include more fields depending on which include[] parameters you specified.
+
+{
+ "count": 6,
+ "next": null,
+ "previous": null,
+ "results": {
+ "reservations": [
+ {
+ "id": 15646,
+ "arrival_date": "2024-05-06",
+ "departure_date": "2024-05-16",
+ "check_in_time": "18:00:00",
+ "check_out_time": "20:00:00",
+ "market": null,
+ "source": {
+ "id": 5
+ },
+ "channel": {
+ "id": 2,
+ "name": "Individual"
+ },
+ "voucher_no": "",
+ "block": null,
+ "country": {
+ "id": "AF",
+ "iso": "AF"
+ },
+ "state": {
+ "id": 3,
+ "name": "Expected"
+ },
+ "arrival_flight_number": null,
+ "arrival_flight_time": null,
+ "departure_flight_number": null,
+ "departure_flight_time": null,
+ "attachment": null,
+ "actual_departure_date": null,
+ "booker": null,
+ "name": {
+ "id": 2,
+ "name": "ahmed monir monir",
+ "first_name": "ahmed",
+ "last_name": "monir monir"
+ },
+ "other_names": [],
+ "group_reservation": null,
+ "account": 15670,
+ "credit_card": "",
+ "guest_flag": {
+ "id": 1
+ },
+ "order": null,
+ "created_on": "2024-12-24T17:27:25.491651Z",
+ "updated_on": "2024-12-24T18:57:16.739217Z",
+ "guarantee_type": 3,
+ "rate_confirmation": "Confirmed",
+ "closed_to_cashiering": false,
+ "first_meal": {
+ "id": 2,
+ "name": "Lunch",
+ "order": 2
+ },
+ "language": {
+ "id": 2
+ },
+ "bulk_rate": false,
+ "company": null,
+ "purpose_of_stay": "1",
+ "confirmation_sent": false,
+ "room_nights": [
+ {
+ "room_type": {
+ "id": 3
+ },
+ "rate": {
+ "id": 25
+ },
+ "currency": {
+ "id": 1
+ },
+ "board_type": {
+ "id": 3,
+ "description": "Full Board"
+ },
+ "actual_room_type": {
+ "id": 3
+ },
+ "from_date": "2024-05-06",
+ "to_date": "2024-05-15"
+ }
+ ],
+ "remarks": "",
+ "arrival_datetime": "2024-05-06T18:00:00Z",
+ "departure_datetime": "2024-05-16T20:00:00Z",
+ "reservation_mode": "daily",
+ "hold_date": null,
+ "hold_status": "CONFIRMED",
+ "edits": {
+ "created_by": {
+ "id": 1,
+ "username": "admin",
+ "action_time": "2024-12-24T17:27:25.765776Z"
+ },
+ "updated_by": {
+ "id": 1,
+ "username": "admin",
+ "action_time": "2024-12-24T18:57:17.163818Z"
+ }
+ },
+ "readonly": false,
+ "balance": 0,
+ "shared": false,
+ "attachments": [],
+ "card_compartment": null,
+ "notes": [],
+ "do_not_move": false,
+ "auto_send_folio": false,
+ "reservation_confirmation": "Confirmed",
+ "current_room_night": {
+ "id": 4714,
+ "room_type": {
+ "id": 3
+ },
+ "room_number": null,
+ "rate": {
+ "id": 25
+ },
+ "currency": {
+ "id": 1
+ },
+ "date": "2024-05-06",
+ "board_type": {
+ "id": 3
+ },
+ "actual_room_type": {
+ "id": 3,
+ "room_type": "Double Deluxe"
+ }
+ }
+ },
+ {
+ "id": 15645,
+ "arrival_date": "2024-05-06",
+ "departure_date": "2024-05-16",
+ "check_in_time": "18:00:00",
+ "check_out_time": "20:00:00",
+ "market": null,
+ "source": {
+ "id": 5
+ },
+ "channel": {
+ "id": 2,
+ "name": "Individual"
+ },
+ "voucher_no": "",
+ "block": null,
+ "country": {
+ "id": "AF",
+ "iso": "AF"
+ },
+ "state": {
+ "id": 3,
+ "name": "Expected"
+ },
+ "arrival_flight_number": null,
+ "arrival_flight_time": null,
+ "departure_flight_number": null,
+ "departure_flight_time": null,
+ "attachment": null,
+ "actual_departure_date": null,
+ "booker": null,
+ "name": {
+ "id": 19,
+ "name": "Avail test",
+ "first_name": "Avail",
+ "last_name": "test"
+ },
+ "other_names": [],
+ "group_reservation": null,
+ "account": 15669,
+ "credit_card": "",
+ "guest_flag": null,
+ "order": null,
+ "created_on": "2024-12-24T17:25:40.224864Z",
+ "updated_on": "2024-12-24T17:26:57.877746Z",
+ "guarantee_type": 3,
+ "rate_confirmation": "Confirmed",
+ "closed_to_cashiering": false,
+ "first_meal": {
+ "id": 2,
+ "name": "Lunch",
+ "order": 2
+ },
+ "language": null,
+ "bulk_rate": false,
+ "company": null,
+ "purpose_of_stay": "1",
+ "confirmation_sent": false,
+ "room_nights": [
+ {
+ "room_type": {
+ "id": 3
+ },
+ "rate": {
+ "id": 23
+ },
+ "currency": {
+ "id": 3
+ },
+ "board_type": {
+ "id": 1,
+ "description": "Bed and Breakfast"
+ },
+ "actual_room_type": {
+ "id": 3
+ },
+ "from_date": "2024-05-06",
+ "to_date": "2024-05-15"
+ }
+ ],
+ "remarks": "",
+ "arrival_datetime": "2024-05-06T18:00:00Z",
+ "departure_datetime": "2024-05-16T20:00:00Z",
+ "reservation_mode": "daily",
+ "hold_date": null,
+ "hold_status": "CONFIRMED",
+ "edits": {
+ "created_by": {
+ "id": 1,
+ "username": "admin",
+ "action_time": "2024-12-24T17:25:40.479355Z"
+ },
+ "updated_by": {
+ "id": 1,
+ "username": "admin",
+ "action_time": "2024-12-24T17:26:58.309095Z"
+ }
+ },
+ "readonly": false,
+ "balance": 0,
+ "shared": false,
+ "attachments": [],
+ "card_compartment": null,
+ "notes": [],
+ "do_not_move": false,
+ "auto_send_folio": false,
+ "reservation_confirmation": "Confirmed",
+ "current_room_night": {
+ "id": 4704,
+ "room_type": {
+ "id": 3
+ },
+ "room_number": null,
+ "rate": {
+ "id": 23
+ },
+ "currency": {
+ "id": 3
+ },
+ "date": "2024-05-06",
+ "board_type": {
+ "id": 1
+ },
+ "actual_room_type": {
+ "id": 3,
+ "room_type": "Double Deluxe"
+ }
+ }
+ }
+
+
+
+5. Response Structure & Key Fields
+
+Field
+Example
+Explanation
+id
+15646
+Unique identifier for the reservation.
+arrival_date
+"2024-05-06"
+Scheduled arrival date (in YYYY-MM-DD format).
+departure_date
+"2024-05-16"
+Scheduled departure date (in YYYY-MM-DD format).
+check_in_time
+"18:00:00"
+Planned check-in time (HH:MM:SS).
+check_out_time
+"20:00:00"
+Planned check-out time (HH:MM:SS).
+market
+null or "Corporate"
+Market segment or category (if defined).
+source
+{ "id": 5 }
+Indicates where the booking originated (could be direct, OTA, etc.).
+channel
+{ "id": 2, "name": "Individual" }
+Booking channel information typically includes an ID and a channel name.
+country
+{ "id": "AF", "iso": "AF" }
+Guest’s country data (ISO code, etc.).
+state
+{ "id": 3, "name": "Expected" }
+The current status of the reservation (e.g., “Expected,” “Checked In,” “Canceled”).
+name
+{ "id": 2, "first_name": "ahmed", ... }
+Object containing guest name details (e.g., first_name, last_name, guest_preferences).
+"other_names":
+ 
+Contains other guests
+group_reservation
+null or { "name": "Group ABC", ... }
+If part of a group, contains group reservation details (e.g., name, confirmation_number). Otherwise, null.
+balance
+0 or any numeric value
+Current outstanding balance on the reservation’s folio/account.
+shared
+false or true
+Indicates whether the room is shared among multiple guests.
+current_room_night
+{ "id": 4714, "room_number": null, ... }
+Provides details about the assigned room for the current date (if any): room number, room type, rate, etc.
+current_room_night.room_number
+null or "101"
+Assigned room number (if any has been allocated).
+current_room_night.actual_room_type
+{ "id": 3, "room_type": "Double Deluxe" }
+The actual room type assigned (e.g., “Double Deluxe”).
+guest_flag
+null or { "id": 1 }
+Indicates special guest flags or VIP status (if used).1 VIP 
+2 Honeymooners 
+3 Anniversary
+Please note this is a configuration so different hotels can add more flags 
+remarks
+"" or "Special request for late check-out"
+Free-text notes or comments about the reservation.
+room_nights.board_type
+"board_type": {"id": 3}
+
+Reservation Board type
+Room_nights.board_type. description
+"board_type": {"id": 3,
+ "description": "Full Board"}
+
+Reservation Board type description 
+
+For more info about the guest like email and telephone use the Individual Profile API
+
+1. Overview
+This API call retrieves details of a specific Individual Profile in the Kwentra system. An “Individual Profile” usually represents a guest record, containing personal information such as name, nationality, contact details, and identification documents.
+In this example, the URL ends with 2, we’re fetching the profile with the internal ID = 2. Which is provided in the name key in Get Reservation API
+"name": {
+ "id": 2,
+ "name": "ahmed monir monir",
+ "guest_preferences": "...",
+ "first_name": "ahmed",
+ "last_name": "monir monir"
+ },
+
+
+2. Example Request
+
+curl --request GET \
+ --url 'https://manage.kwentra.com/api/core/individualprofile/v3/2?include%5B%5D=name&include%5B%5D=nationality_object.name&include%5B%5D=email&include%5B%5D=telephone&include%5B%5D=mobile&include%5B%5D=id&include%5B%5D=passport&include%5B%5D=first_name&include%5B%5D=last_name&include%5B%5D=document_type.name&include%5B%5D=issue_date&include%5B%5D=issue_place&include%5B%5D=work_phone&include%5B%5D=driving_license_number&include%5B%5D=old_id&include%5B%5D=ID_number&include%5B%5D=occupation&include%5B%5D=individualprofilecontactinfo_set.city&include%5B%5D=individualprofilecontactinfo_set.country.name&include%5B%5D=guest_preferences&tenant_id=394' \
+ --header 'Authorization: Basic VGVzdFVzZXI6VGVzdFVzZXIuMTIz' \
+ --header 'accept: application/json, text/plain, */*'
+
+2.1 Base URL
+
+https://manage.kwentra.com/api/core/individualprofile/v3
+
+3. Parameter Explanation
+Below is a table showing each query parameter used in this request, along with a brief explanation:
+Parameter
+Example
+Short Explanation
+tenant_id
+394
+Specifies which tenant (hotel/property) you want to query.
+include[]=name
+name
+Returns the profile’s “name” field (could be full name or a display name, depending on the system).
+include[]=nationality_object.name
+nationality_object.name
+Returns the name of the nationality object (e.g., “Egyptian,” “British”).
+include[]=email
+email
+Returns the primary email address of the individual.
+include[]=telephone
+telephone
+Returns the landline (or main phone) number.
+include[]=mobile
+mobile
+Returns the mobile phone number.
+include[]=id
+id
+Returns the unique ID of the individual the same as the one in the URL if this is the main ID.
+include[]=passport
+passport
+Returns the passport number if available.
+include[]=first_name
+first_name
+Returns the individual’s first name.
+include[]=last_name
+last_name
+Returns the individual’s last name (or surname).
+include[]=document_type.name
+document_type.name
+Returns the name of the document type (e.g., “Passport,” “National ID”).
+include[]=issue_date
+issue_date
+Returns the date the document (e.g., passport) was issued.
+include[]=issue_place
+issue_place
+Returns the place where the document was issued.
+include[]=work_phone
+work_phone
+Returns the individual’s work phone number.
+include[]=driving_license_number
+driving_license_number
+Returns the individual’s driving license number.
+include[]=old_id
+old_id
+Returns a legacy ID if one exists in the system.
+include[]=ID_number
+ID_number
+Returns the official ID number (could be a national ID).
+include[]=occupation
+occupation
+Returns the individual’s occupation or job title.
+include[]=individualprofilecontactinfo_set.city
+individualprofilecontactinfo_set.city
+Returns the city name(s) from the contact info set.
+include[]=individualprofilecontactinfo_set.country.name
+individualprofilecontactinfo_set.country.name
+Returns the name of the country associated with each contact info entry.
+include[]=guest_preferences
+guest_preferences
+Returns any guest preferences or special notes (e.g., “Non-smoker,” “High floor preference”).
+
+4. Example Response
+Below is a sample JSON response for the Individual Profile with ID = 2. 
+
+{
+ "individual_profile": {
+ "id": 12,
+ "name": "Ahmed Maherx",
+ "nationality": "EG",
+ "email": "maher@maher.com",
+ "telephone": "",
+ "mobile": "123123123",
+ "work_phone": null,
+ "language": null,
+ "gender": null,
+ "date_of_birth": null,
+ "occupation": null,
+ "company": null,
+ "ID_number": null,
+ "passport": null,
+ "zip_code": null,
+ "po_box": null,
+ "issue_date": null,
+ "issue_place": null,
+ "driving_license_number": null,
+ "guest_preferences": "loves a smoking room",
+ "first_name": "Ahmed",
+ "last_name": "Maherx",
+ "signature": null,
+ "expiry_date": null,
+ "document_type": "",
+ "place_of_birth": "",
+ "last_activity_date": null,
+ "keep_personal_info": false,
+ "keep_email": false,
+ "email_third_party": false,
+ "service_id": 2299,
+ "old_id": null,
+ "individualprofilecontactinfo_set": [
+ {
+ "id": 12,
+ "profile": 12,
+ "country": {
+ "id": "EG",
+ "iso": "EG",
+ "name": "EGYPT"
+ },
+ "contact_type": {
+ "id": 1,
+ "description": "Main"
+ },
+ "address": "164 Faisal street-Giza Giza",
+ "city": "Giza",
+ "zip_code": "",
+ "po_box": ""
+ }
+ ],
+ "letter_greeting": null,
+ "nationality_object": {
+ "id": "EG",
+ "iso": "EG",
+ "name": "EGYPT"
+ },
+ "attachments": []
+ }
+}
+
+
+
+5. Response Fields Explained
+Field
+Example
+Short Explanation
+id
+2
+The primary identifier for this individual profile.
+name
+"John Doe"
+A combined or display name for the individual.
+nationality_object.name
+"American"
+The individual’s nationality name (as requested by include[]=nationality_object.name).
+email
+"john.doe@example.com"
+The individual’s primary email address.
+telephone
+"+1 212-123-4567"
+A landline or main phone number.
+mobile
+"+1 917-555-7890"
+The individual’s mobile phone number.
+passport
+"123456789"
+Passport number if provided.
+first_name
+"John"
+The individual’s first name.
+last_name
+"Doe"
+The individual’s last name (surname).
+document_type.name
+"Passport"
+The type of identification document (e.g., “Passport,” “National ID”).
+issue_date
+"2019-05-01"
+The date the ID or document was issued (YYYY-MM-DD).
+issue_place
+"New York"
+The place where the ID or document was issued.
+work_phone
+"+1 212-999-0000"
+The individual’s work phone number.
+driving_license_number
+"D123-4567-89"
+The individual’s driving license number.
+old_id
+null or "1001"
+A legacy or old ID in case the system was migrated from another platform.
+ID_number
+null or "ABC123"
+A national or official ID number, if available.
+occupation
+"Software Engineer"
+The individual’s job title or occupation.
+guest_preferences
+"Prefers quiet room, upper floor"
+Notes about guest preferences or special requests.
+individualprofilecontactinfo_set
+(array)
+List of additional contact info objects (e.g., city, country).
+individualprofilecontactinfo_set[].city
+"Manhattan"
+City associated with this contact info record.
+individualprofilecontactinfo_set[].country.name
+"United States"
+The name of the country for this contact info record.
+
+And here is a mapping of the required fields to Kwentra api responses 
+Required Field
+API & Key
+CONF. NO
+Reservation API (v2): reservation.id
+ROOM
+Reservation API (v2): current_room_night.room_number
+RESV. STATUS
+Reservation API (v2): state.name
+GUEST LAST NAME
+Reservation API (v2): name.last_name Profile API (v3): last_name
+GUEST FIRST NAME
+Reservation API (v2): name.first_name Profile API (v3): first_name
+ARRIVAL
+Reservation API (v2): arrival_date
+DEPARTURE
+Reservation API (v2): departure_date
+ADULTS
+Reservation API (v2): current_room_night.number_of_adults
+CHILDREN
+Reservation API (v2): current_room_night.number_of_children
+EMAIL
+Profile API (v3): email
+PHONE
+Profile API (v3): telephone (landline) or mobile
+SOURCE NAME
+Reservation API (v2): source.name 
+TRAVEL AGENT
+Reservation API (v2): channel.name
+PROFILE ID
+Reservation API (v2): name.id 
+ROOM TYPE
+Reservation API (v2): current_room_night.actual_room_type.room_type
+VIP
+Reservation API (v2): guest_flag 
+MEAL TYPE
+Reservation API (v2): room_nights.board_type
+GROUP NAME
+Reservation API (v2): group_reservation.name
+RESV. NUMBER
+Reservation API (v2): id (the reservation’s unique ID) 
+isMAIN
+Reservation API (v2): The resevation.name contains the main guest all the time "other_names" key contains accompanied guests
+CUSTOM REFERENCE
+Reservation API (v2): Possibly voucher_no.
+COUNTRY
+Reservation API (v2): country.iso Profile API (v3): nationality_object.name or individualprofilecontactinfo_set.country.name
+
+Editing Gust information using individual profile v3 Api put method First use the get method on the profile Id you want to edit 
+And from the response parse all the data to construct the individual profile v3 Api body 
+Example Call 
+curl --request PUT \
+ --url 'https://manage.kwentra.com/api/core/individualprofile/v3/12/?tenant_id=394&=' \
+ --header 'Accept: application/json, text/plain, */*' \
+ --header 'Authorization: Basic VGVzdFVzZXI6VGVzdFVzZXIuMTIz' \
+ --header 'Content-Type: application/json' \
+ --data '{
+ "first_name": "Ahmed",
+ "last_name": "Maherx",
+ "date_of_birth": null,
+ "language": null,
+ "gender": null,
+ "nationality_object": "EG",
+ "guest_preferences": "loves a smoking room ",
+ "letter_greeting": null,
+ "place_of_birth": "",
+ "company": null,
+ "occupation": null,
+ "old_id": null,
+ "loyalty_points": null,
+ "document_type": "",
+ "ID_number": null,
+ "issue_place": null,
+ "issue_date": null,
+ "expiry_date": null,
+ "passport": null,
+ "driving_license_number": null,
+ "email": "maher@maher.com",
+ "mobile": "123123123",
+ "telephone": "",
+ "work_phone": null,
+ "keep_email": false,
+ "email_third_party": false,
+ "keep_personal_info": false,
+ "individualprofilecontactinfo_set": [
+ {
+ "address": "164 Faisal street-Giza Giza",
+ "city": "Giza",
+ "country": {
+ "id": "EG",
+ "iso": "EG",
+ "name": "EGYPT"
+ },
+ "zip_code": "",
+ "id": 12,
+ "profile": 12,
+ "po_box": "",
+ "contact_type": {
+ "id": 1,
+ "description": "Main"
+ }
+ }
+ ],
+ "attachments": null
+}'
+
+
+Response example
+ 
+{
+ "individual_profile": {
+ "id": 12,
+ "name": "Ahmed Maherx",
+ "nationality": "EG",
+ "email": "maher@maher.com",
+ "telephone": "",
+ "mobile": "123123123",
+ "work_phone": null,
+ "language": null,
+ "gender": null,
+ "date_of_birth": null,
+ "occupation": null,
+ "company": null,
+ "ID_number": null,
+ "passport": null,
+ "zip_code": null,
+ "po_box": null,
+ "issue_date": null,
+ "issue_place": null,
+ "driving_license_number": null,
+ "guest_preferences": "loves a smoking room",
+ "first_name": "Ahmed",
+ "last_name": "Maherx",
+ "signature": null,
+ "expiry_date": null,
+ "document_type": "",
+ "place_of_birth": "",
+ "last_activity_date": null,
+ "keep_personal_info": false,
+ "keep_email": false,
+ "email_third_party": false,
+ "service_id": 2299,
+ "old_id": null,
+ "individualprofilecontactinfo_set": [
+ {
+ "id": 12,
+ "profile": 12,
+ "country": {
+ "id": "EG",
+ "iso": "EG",
+ "name": "EGYPT"
+ },
+ "contact_type": {
+ "id": 1,
+ "description": "Main"
+ },
+ "address": "164 Faisal street-Giza Giza",
+ "city": "Giza",
+ "zip_code": "",
+ "po_box": ""
+ }
+ ],
+ "letter_greeting": null,
+ "nationality_object": {
+ "id": "EG",
+ "iso": "EG",
+ "name": "EGYPT"
+ },
+ "attachments": []
+ }
+}
+
+
+
+Using this method you can edit any info including the guest preferences 
+For data integrity, it's essential to include all fields returned by the GET request within the PUT request body.
+Adding attachment to guest profile 
+
+To add attachment use the following post API on the profile Id
+
+curl --request POST \
+ --url 'https://manage.kwentra.com/api/core/individualprofile/v3/1/attachments?tenant_id=394' \
+ --header 'Accept: application/json, text/plain, */*' \
+ --header 'Authorization: Basic VGVzdFVzZXI6VGVzdFVzZXIuMTIz' \
+ --header 'Content-Type: multipart/form-data' \
+ --cookie 'instance_id=394; instance_name=Demo1; instance_tz=UTC; date_format=%25Y-%25m-%25d; time_format=%22am%2Fpm%22; user_id=749; 
+ --form 'file=@/home/monirs/Downloads/Screenshot from 2025-01-13 12-33-27.png'
+
+ 
+
+Response example
+{
+ "id": 4,
+ "url": "https://storage.googleapis.com/kwentra-uploads/uploads/test/onlinebookingcom_demo1/Screenshot_from_2025-01-13_12-33-27_gcgDhCy.png?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=blobs-sign%40earthcouch.iam.gserviceaccount.com%2F20250212%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20250212T170111Z&X-Goog-Expires=86400&X-Goog-SignedHeaders=host&X-Goog-Signature=8c033e9fca4c5fb41ffa7c626b4c717dfe94c49ab1b6ce8b7b29e61068d6e88fb80000f0b8ac5c6484cd806ead7c2b87c1d417f074cfc78dd7ccbfff4068004b87932b3165ab7445e7813dbba9b16d8b69741517afcac3e6710c7530dcb88ef58d1cd3e25059c8aa98dae9885641098f21e6259726fbf4b940c3ac1e0b7fc29579a7aee13eef1cef4a697dec7fcff78076618db1d72e9458ca3009784fb5a8acd9519525428a0ce7bd159d52994e98b45aae3feffb3c99d21ca9714e504991838bc9136c35ac99c849c822bb72d35a26fc244e7cde135535d5d37dedc52ebe2bbf4af4a58f5c783c7f19fab511790289699adddf13af715b7ef99ee7d258f332",
+ "name": "Screenshot from 2025-01-13 12-33-27.png"
+}
+
+

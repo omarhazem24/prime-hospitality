@@ -1,0 +1,326 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Coolors: white / ink / gold — light mode */
+  --prime-night: #221f20;
+  --prime-fg: #221f20;
+  --prime-charcoal: #2e2a2b;
+  --prime-gold: #ac946b;
+  --prime-gold-soft: #c4af8a;
+  --prime-gold-deep: #8a7654;
+  --prime-muted: #6e6764;
+  --prime-line: #e6e2dd;
+  --prime-sand: #faf9f8;
+  --prime-mist: #f2f0ed;
+  --prime-surface: #ffffff;
+  --prime-white: #ffffff;
+  --prime-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.dark {
+  --prime-night: #0e0d0d;
+  --prime-fg: #f3f0ec;
+  --prime-charcoal: #c4b8a8;
+  --prime-gold: #ac946b;
+  --prime-gold-soft: #c4af8a;
+  --prime-gold-deep: #d0b78c;
+  --prime-muted: #9a928c;
+  --prime-line: #2e2b2c;
+  --prime-sand: #121011;
+  --prime-mist: #181616;
+  --prime-surface: #1c1a1b;
+  --prime-white: #1c1a1b;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-prime-sand font-sans text-prime-ink antialiased;
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  font-feature-settings: 'ss01' on, 'kern' on;
+  letter-spacing: 0.01em;
+  background-color: var(--prime-sand);
+  background-image:
+    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(172, 148, 107, 0.08), transparent 50%);
+  transition: background-color 0.35s var(--prime-ease), color 0.35s var(--prime-ease);
+}
+
+html.dark body {
+  background-image:
+    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(172, 148, 107, 0.06), transparent 50%);
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+::selection {
+  background: rgba(172, 148, 107, 0.35);
+  color: var(--prime-fg);
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-feature-settings: 'liga' on, 'kern' on;
+  font-optical-sizing: auto;
+}
+
+@layer components {
+  .prime-eyebrow {
+    @apply text-[10px] font-semibold uppercase tracking-[0.3em] text-prime-muted;
+  }
+
+  .prime-display {
+    @apply font-display font-bold tracking-[-0.03em] text-prime-ink;
+  }
+
+  .prime-keyline {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 12rem;
+  }
+
+  .prime-keyline::before,
+  .prime-keyline::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--prime-gold), transparent);
+  }
+
+  .prime-keyline--gold::before,
+  .prime-keyline--gold::after {
+    background: linear-gradient(90deg, transparent, rgba(172, 148, 107, 0.9), transparent);
+  }
+
+  .prime-keyline--light::before,
+  .prime-keyline--light::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  }
+
+  .prime-keyline__mark {
+    width: 6px;
+    height: 6px;
+    rotate: 45deg;
+    border: 1px solid var(--prime-gold);
+    background: transparent;
+    flex-shrink: 0;
+  }
+
+  .prime-keyline--light .prime-keyline__mark {
+    border-color: rgba(255, 255, 255, 0.55);
+  }
+
+  .prime-section {
+    @apply py-20 md:py-28;
+  }
+
+  .prime-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-none bg-prime-ink px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-sand transition duration-300 hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-prime-gold focus-visible:ring-offset-2 focus-visible:ring-offset-prime-sand;
+  }
+
+  .prime-btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-none bg-prime-gold px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-night transition duration-300 hover:bg-prime-gold-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-prime-gold focus-visible:ring-offset-2 focus-visible:ring-offset-prime-sand;
+  }
+
+  .prime-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border border-white/40 bg-transparent px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white transition duration-300 hover:border-prime-gold hover:text-prime-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50;
+  }
+
+  .prime-input {
+    @apply w-full rounded-none border border-prime-line bg-prime-surface px-3.5 py-2.5 text-sm font-medium text-prime-ink placeholder:font-normal focus:border-prime-gold focus:outline-none focus:ring-1;
+  }
+
+  .prime-input::placeholder {
+    color: color-mix(in srgb, var(--prime-muted) 65%, transparent);
+  }
+
+  .prime-input:focus {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--prime-gold) 40%, transparent);
+  }
+
+  .prime-fade-in {
+    animation: primeFadeIn 0.85s var(--prime-ease) both;
+  }
+
+  .prime-fade-up {
+    animation: primeFadeUp 1s var(--prime-ease) both;
+  }
+
+  .prime-kenburns {
+    animation: primeKenBurns 20s ease-in-out infinite alternate;
+  }
+
+  .prime-search-dock {
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  }
+
+  /* Header stays light-branded regardless of html.dark theme */
+  .prime-header-shell {
+    --prime-night: #221f20;
+    --prime-fg: #221f20;
+    --prime-charcoal: #2e2a2b;
+    --prime-gold: #ac946b;
+    --prime-gold-soft: #c4af8a;
+    --prime-gold-deep: #8a7654;
+    --prime-muted: #6e6764;
+    --prime-line: #e6e2dd;
+    --prime-sand: #faf9f8;
+    --prime-mist: #f2f0ed;
+    --prime-surface: #ffffff;
+    --prime-white: #ffffff;
+    color-scheme: light;
+  }
+
+  .prime-frame {
+    position: relative;
+  }
+
+  .prime-frame::before,
+  .prime-frame::after {
+    content: '';
+    position: absolute;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-color: rgba(172, 148, 107, 0.55);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .prime-frame::before {
+    top: 1.25rem;
+    inset-inline-start: 1.25rem;
+    border-top: 1px solid;
+    border-inline-start: 1px solid;
+  }
+
+  .prime-frame::after {
+    bottom: 1.25rem;
+    inset-inline-end: 1.25rem;
+    border-bottom: 1px solid;
+    border-inline-end: 1px solid;
+  }
+
+  /* Theme toggle switch */
+  .prime-theme-toggle {
+    @apply relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-prime-line bg-prime-mist transition sm:h-8 sm:w-14;
+  }
+
+  .prime-theme-toggle[data-on='true'] {
+    @apply bg-prime-night;
+    border-color: color-mix(in srgb, var(--prime-gold) 50%, transparent);
+  }
+
+  .prime-theme-toggle__thumb {
+    @apply absolute start-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-prime-surface text-prime-ink shadow-sm transition-transform duration-300 sm:h-6 sm:w-6;
+  }
+
+  .prime-theme-toggle[data-on='true'] .prime-theme-toggle__thumb {
+    @apply translate-x-5 bg-prime-gold text-prime-night sm:translate-x-6;
+  }
+}
+
+@layer utilities {
+  /* Map common white surfaces to theme surface in dark mode */
+  .dark .bg-white {
+    background-color: var(--prime-surface);
+  }
+  .dark .bg-white\/50 {
+    background-color: color-mix(in srgb, var(--prime-surface) 50%, transparent);
+  }
+  .dark .bg-white\/60 {
+    background-color: color-mix(in srgb, var(--prime-surface) 60%, transparent);
+  }
+  .dark .bg-white\/70 {
+    background-color: color-mix(in srgb, var(--prime-surface) 70%, transparent);
+  }
+  .dark .bg-white\/80 {
+    background-color: color-mix(in srgb, var(--prime-surface) 80%, transparent);
+  }
+  .dark .bg-white\/90 {
+    background-color: color-mix(in srgb, var(--prime-surface) 90%, transparent);
+  }
+  .dark .bg-white\/95 {
+    background-color: color-mix(in srgb, var(--prime-surface) 95%, transparent);
+  }
+  .dark .hover\:bg-white:hover {
+    background-color: var(--prime-surface);
+  }
+}
+
+@keyframes primeFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes primeFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes primeKenBurns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes primeSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prime-fade-in,
+  .prime-fade-up,
+  .prime-kenburns {
+    animation: none;
+  }
+}

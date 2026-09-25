@@ -1,0 +1,16 @@
+{
+  "name": "prime-hospitality",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n server,client -c gold,cyan \"npm run dev --prefix Server\" \"npm run dev --prefix Client\"",
+    "dev:server": "npm run dev --prefix Server",
+    "dev:client": "npm run dev --prefix Client",
+    "install:all": "npm install --prefix Server && npm install --prefix Client",
+    "build": "npm run build --prefix Client",
+    "start": "npm run start --prefix Server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

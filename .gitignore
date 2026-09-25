@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+Client/node_modules/
+Server/node_modules/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+**/.env
+!**/.env.example
+
+# Build
+Client/dist/
+Server/dist/
+*.local
+
+# Logs & OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# Local data / uploads
+Server/data/*.tmp
+Server/data/cms-store.json.tmp
+
+# Misc
+coverage/
+.cache/
