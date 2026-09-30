@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, MapPin, Search, Users } from 'lucide-react';
+import { ArrowRight, ChevronDown, MapPin, Minus, Plus } from 'lucide-react';
 import DateRangePicker from '../ui/DateRangePicker';
 import { useLocale } from '../../context/LocaleContext';
 import api from '../../api/client';
@@ -16,48 +16,74 @@ const isAfterDay = (a, b) => {
 function placeMenu(anchorEl, { align = 'start', minWidth = 240, maxWidth = 360 } = {}) {
   if (!anchorEl) return null;
   const rect = anchorEl.getBoundingClientRect();
-  const width = Math.min(maxWidth, Math.max(rect.width, minWidth));
+  const width = Math.min(maxWidth, Math.max(rect.width, minWidth), window.innerWidth - 24);
   let left = align === 'end' ? rect.right - width : rect.left;
-  if (left + width > window.innerWidth - 12) {
-    left = Math.max(12, window.innerWidth - width - 12);
-  }
+  if (left + width > window.innerWidth - 12) left = Math.max(12, window.innerWidth - width - 12);
   left = Math.max(12, left);
+  const below = window.innerHeight - rect.bottom;
+  const openUp = below < 320 && rect.top > below;
   return {
     position: 'fixed',
-    top: rect.bottom + 8,
+    ...(openUp ? { bottom: window.innerHeight - rect.top + 8 } : { top: rect.bottom + 8 }),
     left,
     width,
+    maxHeight: Math.max(220, (openUp ? rect.top : below) - 24),
     zIndex: 400,
   };
 }
 
-export default function HeroSearch({ compact = false }) {
+function useFloating(open, anchorRef, options) {
+  const [style, setStyle] = useState(null);
+  useLayoutEffect(() => {
+    if (!open) {
+      setStyle(null);
+      return undefined;
+    }
+    const update = () => setStyle(placeMenu(anchorRef.current, options));
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+    // options are static per call site
+  }, [open]);
+  return style;
+}
+
+const fieldBtn =
+  'group flex h-full w-full items-center gap-3 px-5 py-4 text-start transition-colors hover:bg-prime-mist/60 md:px-6 md:py-5';
+const labelCls = 'flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted';
+const valueCls = 'mt-1.5 block truncate font-display text-[1.3rem] font-medium leading-none';
+
+export default function HeroSearch() {
   const navigate = useNavigate();
   const { t } = useLocale();
   const projectBtnRef = useRef(null);
   const guestBtnRef = useRef(null);
   const projectMenuRef = useRef(null);
   const guestMenuRef = useRef(null);
-  const [compounds, setCompounds] = useState([]);
-
+  const [destinations, setDestinations] = useState([]);
   const [criteria, setCriteria] = useState({
     project: '',
+    destinationId: '',
     compoundId: '',
     checkin: '',
     checkout: '',
-    guests: 1,
+    guests: 2,
   });
   const [projectOpen, setProjectOpen] = useState(false);
   const [guestOpen, setGuestOpen] = useState(false);
-  const [projectStyle, setProjectStyle] = useState(null);
-  const [guestStyle, setGuestStyle] = useState(null);
+  const projectStyle = useFloating(projectOpen, projectBtnRef, { minWidth: 280, maxWidth: 400 });
+  const guestStyle = useFloating(guestOpen, guestBtnRef, { align: 'end', minWidth: 260, maxWidth: 300 });
 
   useEffect(() => {
     let cancelled = false;
     api
-      .getCompounds()
+      .getDestinations()
       .then((res) => {
-        if (!cancelled) setCompounds(res.items || []);
+        if (!cancelled) setDestinations(res.items || []);
       })
       .catch(() => {});
     return () => {
@@ -65,45 +91,12 @@ export default function HeroSearch({ compact = false }) {
     };
   }, []);
 
-  useLayoutEffect(() => {
-    if (!projectOpen) {
-      setProjectStyle(null);
-      return undefined;
-    }
-    const update = () => setProjectStyle(placeMenu(projectBtnRef.current, { minWidth: 260, maxWidth: 380 }));
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [projectOpen]);
-
-  useLayoutEffect(() => {
-    if (!guestOpen) {
-      setGuestStyle(null);
-      return undefined;
-    }
-    const update = () => setGuestStyle(placeMenu(guestBtnRef.current, { align: 'end', minWidth: 240, maxWidth: 280 }));
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [guestOpen]);
-
   useEffect(() => {
     if (!projectOpen && !guestOpen) return undefined;
     const onOutside = (event) => {
-      const t = event.target;
-      const inProject =
-        projectBtnRef.current?.contains(t) || projectMenuRef.current?.contains(t);
-      const inGuest = guestBtnRef.current?.contains(t) || guestMenuRef.current?.contains(t);
-      if (!inProject) setProjectOpen(false);
-      if (!inGuest) setGuestOpen(false);
+      const target = event.target;
+      if (!(projectBtnRef.current?.contains(target) || projectMenuRef.current?.contains(target))) setProjectOpen(false);
+      if (!(guestBtnRef.current?.contains(target) || guestMenuRef.current?.contains(target))) setGuestOpen(false);
     };
     const onKey = (e) => {
       if (e.key === 'Escape') {
@@ -119,20 +112,22 @@ export default function HeroSearch({ compact = false }) {
     };
   }, [projectOpen, guestOpen]);
 
-  const projects = useMemo(() => compounds, [compounds]);
-  const projectLabel = criteria.project || t('home.whichProject');
+  const hasAnyProjects = useMemo(() => destinations.some((d) => d.projects?.length), [destinations]);
+
+  function choose({ destinationId = '', compoundId = '', label = '' }) {
+    setCriteria((c) => ({ ...c, destinationId, compoundId, project: label }));
+    setProjectOpen(false);
+  }
 
   const hasValidRange =
     criteria.checkin &&
     criteria.checkout &&
-    isAfterDay(
-      new Date(`${criteria.checkout}T00:00:00`),
-      new Date(`${criteria.checkin}T00:00:00`)
-    );
+    isAfterDay(new Date(`${criteria.checkout}T00:00:00`), new Date(`${criteria.checkin}T00:00:00`));
 
   function handleSubmit(event) {
     event.preventDefault();
     const params = new URLSearchParams();
+    if (criteria.destinationId) params.set('destination', criteria.destinationId);
     if (criteria.compoundId) params.set('compound', criteria.compoundId);
     if (criteria.checkin) params.set('checkIn', criteria.checkin);
     if (criteria.checkout) params.set('checkOut', criteria.checkout);
@@ -140,96 +135,57 @@ export default function HeroSearch({ compact = false }) {
     navigate(`/search?${params.toString()}`);
   }
 
-  if (compact) {
-    return (
-      <form
-        onSubmit={handleSubmit}
-        className="grid gap-3 rounded-sm border border-prime-line bg-white p-4 shadow-sm md:grid-cols-[1.2fr_1fr_auto]"
-      >
-        <label className="block text-left">
-          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-prime-muted">
-            {t('home.project')}
-          </span>
-          <select
-            className="prime-input"
-            value={criteria.compoundId}
-            onChange={(e) => {
-              const id = e.target.value;
-              const found = compounds.find((c) => c.id === id);
-              setCriteria((c) => ({
-                ...c,
-                compoundId: id,
-                project: found?.name || '',
-              }));
-            }}
-          >
-            <option value="">{t('home.anyProject')}</option>
-            {compounds.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} — {c.region}
-              </option>
-            ))}
-          </select>
-        </label>
-        <DateRangePicker
-          checkin={criteria.checkin}
-          checkout={criteria.checkout}
-          onChange={({ checkin, checkout }) =>
-            setCriteria((c) => ({ ...c, checkin: checkin || '', checkout: checkout || '' }))
-          }
-        />
-        <button type="submit" className="prime-btn self-end">
-          {t('home.searchStays')}
-        </button>
-      </form>
-    );
-  }
+  const menuShell = 'overflow-y-auto border border-prime-line bg-prime-surface p-1.5 text-prime-ink shadow-premium-lg';
 
   const projectMenu =
-    projectOpen && projectStyle && typeof document !== 'undefined'
+    projectOpen && projectStyle
       ? createPortal(
-          <div
-            ref={projectMenuRef}
-            style={projectStyle}
-            className="max-h-72 overflow-y-auto border border-white/15 bg-prime-night/97 p-1.5 shadow-2xl backdrop-blur-xl"
-          >
+          <div ref={projectMenuRef} style={projectStyle} className={menuShell} role="listbox">
             <button
               type="button"
-              onClick={() => {
-                setCriteria((c) => ({ ...c, project: '', compoundId: '' }));
-                setProjectOpen(false);
-              }}
-              className="flex w-full items-center justify-between px-4 py-3 text-start text-sm text-white/80 transition hover:bg-white/10"
+              onClick={() => choose({})}
+              className="flex w-full items-center px-4 py-3 text-start text-[15px] transition hover:bg-prime-mist"
             >
-              <span>{t('home.anyProject')}</span>
+              {t('home.anyProject')}
             </button>
-            {projects.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  setCriteria((c) => ({
-                    ...c,
-                    project: option.name,
-                    compoundId: option.id,
-                  }));
-                  setProjectOpen(false);
-                }}
-                className={cn(
-                  'flex w-full items-center justify-between px-4 py-3 text-start transition hover:bg-white/10',
-                  criteria.compoundId === option.id && 'bg-white/10'
-                )}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-white">{option.name}</span>
-                  {option.region ? (
-                    <span className="block truncate text-[11px] text-white/45">{option.region}</span>
-                  ) : null}
-                </span>
-              </button>
+            {destinations.map((d) => (
+              <div key={d.id} className="border-t border-prime-line pt-1">
+                <button
+                  type="button"
+                  onClick={() => choose({ destinationId: d.id, label: d.name })}
+                  className={cn(
+                    'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start transition hover:bg-prime-mist',
+                    criteria.destinationId === d.id && !criteria.compoundId && 'bg-prime-mist'
+                  )}
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-prime-gold-deep">
+                    <MapPin size={12} aria-hidden />
+                    <span className="truncate">{d.name}</span>
+                  </span>
+                  <span className="shrink-0 text-[11px] text-prime-muted">
+                    {t('home.propertiesCount', { count: d.projectCount ?? d.projects?.length ?? 0 })}
+                  </span>
+                </button>
+                {(d.projects || []).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => choose({ destinationId: d.id, compoundId: option.id, label: option.name })}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-3 py-2.5 pe-4 ps-9 text-start transition hover:bg-prime-mist',
+                      criteria.compoundId === option.id && 'bg-prime-mist'
+                    )}
+                  >
+                    <span className="block min-w-0 truncate text-[15px]">{option.name}</span>
+                    {option.brand ? (
+                      <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-prime-muted">{option.brand}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             ))}
-            {projects.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-white/50">{t('home.noProjects')}</p>
+            {!destinations.length || !hasAnyProjects ? (
+              <p className="px-4 py-3 text-sm text-prime-muted">{t('home.noProjects')}</p>
             ) : null}
           </div>,
           document.body
@@ -237,28 +193,28 @@ export default function HeroSearch({ compact = false }) {
       : null;
 
   const guestMenu =
-    guestOpen && guestStyle && typeof document !== 'undefined'
+    guestOpen && guestStyle
       ? createPortal(
-          <div
-            ref={guestMenuRef}
-            style={guestStyle}
-            className="border border-white/15 bg-prime-night/97 p-5 shadow-2xl backdrop-blur-xl"
-          >
-            <div className="flex items-center justify-between gap-4">
+          <div ref={guestMenuRef} style={guestStyle} className={cn(menuShell, 'p-5')}>
+            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted">{t('home.searchGuests')}</p>
+            <div className="mt-4 flex items-center justify-between gap-4">
               <button
                 type="button"
                 onClick={() => setCriteria((c) => ({ ...c, guests: Math.max(1, c.guests - 1) }))}
-                className="flex h-11 w-11 items-center justify-center border border-white/25 text-xl text-white transition hover:border-prime-gold hover:bg-white/10"
+                disabled={criteria.guests <= 1}
+                aria-label="Fewer guests"
+                className="grid h-11 w-11 place-items-center rounded-full border border-prime-line transition hover:border-prime-ink disabled:opacity-40"
               >
-                −
+                <Minus size={16} strokeWidth={1.5} />
               </button>
-              <span className="font-display text-3xl text-white">{criteria.guests}</span>
+              <span className="font-display text-4xl font-medium tabular-nums">{criteria.guests}</span>
               <button
                 type="button"
-                onClick={() => setCriteria((c) => ({ ...c, guests: c.guests + 1 }))}
-                className="flex h-11 w-11 items-center justify-center border border-white/25 text-xl text-white transition hover:border-prime-gold hover:bg-white/10"
+                onClick={() => setCriteria((c) => ({ ...c, guests: Math.min(16, c.guests + 1) }))}
+                aria-label="More guests"
+                className="grid h-11 w-11 place-items-center rounded-full border border-prime-line transition hover:border-prime-ink"
               >
-                +
+                <Plus size={16} strokeWidth={1.5} />
               </button>
             </div>
           </div>,
@@ -269,12 +225,10 @@ export default function HeroSearch({ compact = false }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="prime-search-dock relative z-[60] w-full border border-white/25 bg-prime-night/70 shadow-[0_32px_80px_rgba(34,31,32,0.45)] backdrop-blur-2xl"
+      className="relative z-[60] w-full bg-prime-surface text-prime-ink shadow-[0_30px_80px_rgba(0,0,0,0.25)]"
     >
-      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-prime-gold/80 to-transparent" />
-
-      <div className="grid lg:grid-cols-[1.2fr_1.35fr_0.9fr_auto]">
-        <div className="relative border-b border-white/15 lg:border-b-0 lg:border-e">
+      <div className="grid divide-y divide-prime-line md:grid-cols-[1.25fr_1.5fr_0.9fr_auto] md:divide-x md:divide-y-0 rtl:md:divide-x-reverse">
+        <div className="relative">
           <button
             ref={projectBtnRef}
             type="button"
@@ -284,40 +238,27 @@ export default function HeroSearch({ compact = false }) {
               setProjectOpen((o) => !o);
               setGuestOpen(false);
             }}
-            className="group flex w-full items-center gap-3 px-4 py-4 text-start transition hover:bg-white/[0.06] sm:gap-3.5 sm:px-6 sm:py-6"
+            className={fieldBtn}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-prime-gold/35 bg-white/5 text-prime-gold transition group-hover:border-prime-gold/70">
-              <MapPin size={17} strokeWidth={1.75} />
-            </span>
             <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55">
+              <span className={labelCls}>
                 {t('home.project')}
-                <ChevronDown
-                  size={13}
-                  className={cn('opacity-70 transition', projectOpen && 'rotate-180')}
-                />
+                <ChevronDown size={12} className={cn('transition', projectOpen && 'rotate-180')} />
               </span>
-              <span
-                className={cn(
-                  'mt-1.5 block truncate font-display text-[1.1rem] font-bold leading-none tracking-[-0.02em] sm:text-[1.25rem]',
-                  criteria.project ? 'text-white' : 'text-white/45'
-                )}
-              >
-                {projectLabel}
+              <span className={cn(valueCls, !criteria.project && 'text-prime-muted/80')}>
+                {criteria.project || t('home.whichProject')}
               </span>
             </span>
           </button>
           {projectMenu}
         </div>
 
-        <div className="border-b border-white/15 px-4 py-4 sm:px-5 sm:py-5 lg:border-b-0 lg:border-e">
+        <div>
           <DateRangePicker
             variant="hero"
             checkin={criteria.checkin}
             checkout={criteria.checkout}
-            onChange={({ checkin, checkout }) =>
-              setCriteria((c) => ({ ...c, checkin: checkin || '', checkout: checkout || '' }))
-            }
+            onChange={({ checkin, checkout }) => setCriteria((c) => ({ ...c, checkin: checkin || '', checkout: checkout || '' }))}
             onOpenChange={(open) => {
               if (open) {
                 setProjectOpen(false);
@@ -327,7 +268,7 @@ export default function HeroSearch({ compact = false }) {
           />
         </div>
 
-        <div className="relative border-b border-white/15 lg:border-b-0 lg:border-e">
+        <div className="relative">
           <button
             ref={guestBtnRef}
             type="button"
@@ -336,31 +277,24 @@ export default function HeroSearch({ compact = false }) {
               setGuestOpen((o) => !o);
               setProjectOpen(false);
             }}
-            className="group flex w-full items-center gap-3 px-4 py-4 text-start transition hover:bg-white/[0.06] sm:gap-3.5 sm:px-6 sm:py-6"
+            className={fieldBtn}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-prime-gold/35 bg-white/5 text-prime-gold transition group-hover:border-prime-gold/70">
-              <Users size={17} strokeWidth={1.75} />
-            </span>
             <span className="min-w-0 flex-1">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55">
-                {t('home.searchGuests')}
-              </span>
-              <span className="mt-1.5 block truncate font-display text-[1.25rem] font-bold leading-none tracking-[-0.02em] text-white">
-                {t('common.guestsCount', { count: criteria.guests })}
-              </span>
+              <span className={labelCls}>{t('home.searchGuests')}</span>
+              <span className={valueCls}>{t('common.guestsCount', { count: criteria.guests })}</span>
             </span>
           </button>
           {guestMenu}
         </div>
 
-        <div className="flex items-stretch p-3 sm:p-4">
+        <div className="flex p-2">
           <button
             type="submit"
             disabled={criteria.checkin && criteria.checkout ? !hasValidRange : false}
-            className="inline-flex w-full items-center justify-center gap-2 bg-prime-gold px-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-ink shadow-[0_10px_30px_rgba(184,151,106,0.35)] transition hover:bg-prime-gold-soft disabled:cursor-not-allowed disabled:opacity-50 lg:min-w-[168px]"
+            className="group inline-flex min-h-[3.5rem] w-full items-center justify-center gap-3 bg-prime-ink px-8 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-sand transition hover:bg-prime-gold-deep disabled:cursor-not-allowed disabled:opacity-50 md:min-w-[180px]"
           >
-            <Search size={15} strokeWidth={2.25} />
             {t('home.searchStays')}
+            <ArrowRight size={15} strokeWidth={1.5} className="transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
           </button>
         </div>
       </div>

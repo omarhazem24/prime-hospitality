@@ -2,42 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Prime palette — charcoal + key-gold from the logo, on warm bone / sand neutrals.
+ * Light is the primary brand look; dark keeps the same hierarchy.
+ */
 :root {
-  /* Coolors: white / ink / gold — light mode */
   --prime-night: #221f20;
   --prime-fg: #221f20;
-  --prime-charcoal: #2e2a2b;
+  --prime-charcoal: #3a3536;
   --prime-gold: #ac946b;
-  --prime-gold-soft: #c4af8a;
-  --prime-gold-deep: #8a7654;
-  --prime-muted: #6e6764;
-  --prime-line: #e6e2dd;
-  --prime-sand: #faf9f8;
-  --prime-mist: #f2f0ed;
+  --prime-gold-soft: #cbb893;
+  --prime-gold-deep: #7d6848;
+  --prime-muted: #6b6461;
+  --prime-line: #e4ddd2;
+  --prime-sand: #f7f4ef;
+  --prime-mist: #efe9df;
+  --prime-dune: #e5dac8;
   --prime-surface: #ffffff;
   --prime-white: #ffffff;
   --prime-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --prime-header-h: 4.5rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --prime-header-h: 5.5rem;
+  }
 }
 
 html.dark {
-  --prime-night: #0e0d0d;
-  --prime-fg: #f3f0ec;
-  --prime-charcoal: #c4b8a8;
-  --prime-gold: #ac946b;
-  --prime-gold-soft: #c4af8a;
-  --prime-gold-deep: #d0b78c;
-  --prime-muted: #9a928c;
-  --prime-line: #2e2b2c;
-  --prime-sand: #121011;
-  --prime-mist: #181616;
-  --prime-surface: #1c1a1b;
-  --prime-white: #1c1a1b;
+  --prime-night: #0f0e0e;
+  --prime-fg: #f2eee8;
+  --prime-charcoal: #c9bda9;
+  --prime-gold: #b89f74;
+  --prime-gold-soft: #cfbb95;
+  --prime-gold-deep: #d4bb8f;
+  --prime-muted: #9d958e;
+  --prime-line: #2d2a29;
+  --prime-sand: #141213;
+  --prime-mist: #1b1918;
+  --prime-dune: #25211e;
+  --prime-surface: #1f1c1c;
+  --prime-white: #1f1c1c;
 }
 
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -46,23 +59,17 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
-  font-feature-settings: 'ss01' on, 'kern' on;
-  letter-spacing: 0.01em;
-  background-color: var(--prime-sand);
-  background-image:
-    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(172, 148, 107, 0.08), transparent 50%);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  text-rendering: optimizeLegibility;
   transition: background-color 0.35s var(--prime-ease), color 0.35s var(--prime-ease);
-}
-
-html.dark body {
-  background-image:
-    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(172, 148, 107, 0.06), transparent 50%);
 }
 
 #root {
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 img,
@@ -80,7 +87,7 @@ textarea {
 }
 
 ::selection {
-  background: rgba(172, 148, 107, 0.35);
+  background: rgba(172, 148, 107, 0.3);
   color: var(--prime-fg);
 }
 
@@ -88,17 +95,46 @@ h1,
 h2,
 h3,
 .font-display {
-  font-feature-settings: 'liga' on, 'kern' on;
+  font-feature-settings: 'liga' on, 'kern' on, 'lnum' on;
   font-optical-sizing: auto;
 }
 
+/* The serif is used at 500/600 only — map legacy bold headings onto the loaded cut */
+.font-display.font-bold,
+.font-display.font-extrabold {
+  font-weight: 600;
+}
+
+/* Arabic script must never be letter-spaced — tracking breaks the joined letterforms */
+html[dir='rtl'] body,
+html[dir='rtl'] body * {
+  letter-spacing: 0 !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--prime-gold);
+  outline-offset: 2px;
+}
+
 @layer components {
+  .prime-container {
+    @apply mx-auto w-full max-w-prime px-5 sm:px-8 lg:px-12;
+  }
+
   .prime-eyebrow {
-    @apply text-[10px] font-semibold uppercase tracking-[0.3em] text-prime-muted;
+    @apply text-[11px] font-medium uppercase tracking-[0.3em] text-prime-muted;
   }
 
   .prime-display {
-    @apply font-display font-bold tracking-[-0.03em] text-prime-ink;
+    @apply font-display font-medium text-prime-ink;
+  }
+
+  .prime-lede {
+    @apply text-[15px] font-light leading-[1.75] text-prime-muted md:text-[17px];
+  }
+
+  .prime-section {
+    @apply py-20 md:py-28 lg:py-32;
   }
 
   .prime-keyline {
@@ -140,62 +176,101 @@ h3,
     border-color: rgba(255, 255, 255, 0.55);
   }
 
-  .prime-section {
-    @apply py-20 md:py-28;
-  }
-
   .prime-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-none bg-prime-ink px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-sand transition duration-300 hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-prime-gold focus-visible:ring-offset-2 focus-visible:ring-offset-prime-sand;
+    @apply inline-flex min-h-[3rem] items-center justify-center gap-2.5 rounded-none bg-prime-ink px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-sand transition duration-300 ease-prime hover:bg-prime-gold-deep disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .prime-btn-gold {
-    @apply inline-flex items-center justify-center gap-2 rounded-none bg-prime-gold px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-night transition duration-300 hover:bg-prime-gold-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-prime-gold focus-visible:ring-offset-2 focus-visible:ring-offset-prime-sand;
+    @apply inline-flex min-h-[3rem] items-center justify-center gap-2.5 rounded-none bg-prime-gold px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.26em] text-[#221f20] transition duration-300 ease-prime hover:bg-prime-gold-soft disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .prime-btn-outline {
+    @apply inline-flex min-h-[3rem] items-center justify-center gap-2.5 rounded-none border border-prime-ink/30 bg-transparent px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-ink transition duration-300 ease-prime hover:border-prime-ink hover:bg-prime-ink hover:text-prime-sand;
   }
 
   .prime-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-none border border-white/40 bg-transparent px-8 py-3.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-white transition duration-300 hover:border-prime-gold hover:text-prime-gold focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50;
+    @apply inline-flex min-h-[3rem] items-center justify-center gap-2.5 rounded-none border border-white/45 bg-transparent px-8 py-3.5 text-[11px] font-medium uppercase tracking-[0.26em] text-white transition duration-300 ease-prime hover:border-white hover:bg-white hover:text-[#221f20];
+  }
+
+  /* “Explore more” text link with a drawn line */
+  .prime-link {
+    @apply inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.28em] text-prime-ink transition-colors duration-300 hover:text-prime-gold-deep;
+  }
+
+  .prime-link::after {
+    content: '';
+    display: inline-block;
+    width: 2rem;
+    height: 1px;
+    background: var(--prime-gold);
+    transition: width 0.5s var(--prime-ease);
+  }
+
+  .prime-link:hover::after {
+    width: 3.25rem;
+  }
+
+  .prime-link--light {
+    @apply text-white hover:text-prime-gold-soft;
   }
 
   .prime-input {
-    @apply w-full rounded-none border border-prime-line bg-prime-surface px-3.5 py-2.5 text-sm font-medium text-prime-ink placeholder:font-normal focus:border-prime-gold focus:outline-none focus:ring-1;
+    @apply w-full rounded-none border border-prime-line bg-prime-surface px-4 py-3 text-[15px] text-prime-ink placeholder:font-light focus:border-prime-ink/60 focus:outline-none;
   }
 
   .prime-input::placeholder {
-    color: color-mix(in srgb, var(--prime-muted) 65%, transparent);
+    color: color-mix(in srgb, var(--prime-muted) 70%, transparent);
   }
 
-  .prime-input:focus {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--prime-gold) 40%, transparent);
+  /* Underlined field used on editorial forms (contact, owners) */
+  .prime-field {
+    @apply w-full rounded-none border-0 border-b border-prime-line bg-transparent px-0 py-3.5 text-[16px] text-prime-ink transition-colors placeholder:font-light focus:border-prime-ink focus:outline-none focus:ring-0;
+  }
+
+  .prime-field::placeholder {
+    color: color-mix(in srgb, var(--prime-muted) 75%, transparent);
   }
 
   .prime-fade-in {
-    animation: primeFadeIn 0.85s var(--prime-ease) both;
+    animation: primeFadeIn 0.9s var(--prime-ease) both;
   }
 
   .prime-fade-up {
-    animation: primeFadeUp 1s var(--prime-ease) both;
+    animation: primeFadeUp 1.1s var(--prime-ease) both;
   }
 
   .prime-kenburns {
-    animation: primeKenBurns 20s ease-in-out infinite alternate;
+    animation: primeKenBurns 18s ease-out both;
   }
 
-  .prime-search-dock {
-    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  /* Scroll reveal (see components/ui/Reveal.jsx) */
+  .prime-reveal {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+    transition:
+      opacity 1s var(--prime-ease),
+      transform 1.1s var(--prime-ease);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  .prime-reveal.is-in {
+    opacity: 1;
+    transform: none;
   }
 
   /* Header stays light-branded regardless of html.dark theme */
   .prime-header-shell {
     --prime-night: #221f20;
     --prime-fg: #221f20;
-    --prime-charcoal: #2e2a2b;
+    --prime-charcoal: #3a3536;
     --prime-gold: #ac946b;
-    --prime-gold-soft: #c4af8a;
-    --prime-gold-deep: #8a7654;
-    --prime-muted: #6e6764;
-    --prime-line: #e6e2dd;
-    --prime-sand: #faf9f8;
-    --prime-mist: #f2f0ed;
+    --prime-gold-soft: #cbb893;
+    --prime-gold-deep: #7d6848;
+    --prime-muted: #6b6461;
+    --prime-line: #e4ddd2;
+    --prime-sand: #f7f4ef;
+    --prime-mist: #efe9df;
+    --prime-dune: #e5dac8;
     --prime-surface: #ffffff;
     --prime-white: #ffffff;
     color-scheme: light;
@@ -230,9 +305,13 @@ h3,
     border-inline-end: 1px solid;
   }
 
+  .prime-scroll-x {
+    @apply flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden;
+  }
+
   /* Theme toggle switch */
   .prime-theme-toggle {
-    @apply relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-prime-line bg-prime-mist transition sm:h-8 sm:w-14;
+    @apply relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-prime-line bg-prime-mist transition;
   }
 
   .prime-theme-toggle[data-on='true'] {
@@ -241,11 +320,11 @@ h3,
   }
 
   .prime-theme-toggle__thumb {
-    @apply absolute start-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-prime-surface text-prime-ink shadow-sm transition-transform duration-300 sm:h-6 sm:w-6;
+    @apply absolute start-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-prime-surface text-prime-ink shadow-sm transition-transform duration-300;
   }
 
   .prime-theme-toggle[data-on='true'] .prime-theme-toggle__thumb {
-    @apply translate-x-5 bg-prime-gold text-prime-night sm:translate-x-6;
+    @apply translate-x-5 bg-prime-gold text-prime-night rtl:-translate-x-5;
   }
 }
 
@@ -275,6 +354,14 @@ h3,
   .dark .hover\:bg-white:hover {
     background-color: var(--prime-surface);
   }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
 }
 
 @keyframes primeFadeIn {
@@ -283,6 +370,17 @@ h3,
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes primeDrawerIn {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -299,10 +397,10 @@ h3,
 
 @keyframes primeKenBurns {
   from {
-    transform: scale(1);
+    transform: scale(1.1);
   }
   to {
-    transform: scale(1.07);
+    transform: scale(1);
   }
 }
 
@@ -317,10 +415,71 @@ h3,
   }
 }
 
+@keyframes primeProgress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes primeScrollCue {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(200%);
+  }
+}
+
+@keyframes primeMenuIn {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes primeModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes primeStepIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .prime-fade-in,
   .prime-fade-up,
   .prime-kenburns {
     animation: none;
+  }
+
+  .prime-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

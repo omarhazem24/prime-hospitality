@@ -9,7 +9,6 @@ const compoundsRoutes = require('./routes/compounds');
 const contentRoutes = require('./routes/content');
 const bookingsRoutes = require('./routes/bookings');
 const inquiriesRoutes = require('./routes/inquiries');
-const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const { ensureReady, usingSupabase } = require('./lib/cmsStore');
 const { isCloudinaryConfigured } = require('./config/cloudinary');
@@ -67,11 +66,12 @@ function createApp() {
 
   app.use('/api/units', unitsRoutes);
   app.use('/api/compounds', compoundsRoutes);
+  app.use('/api/properties', compoundsRoutes);
   app.use('/api/destinations', require('./routes/destinations'));
+  app.use('/api/booking', require('./routes/booking'));
   app.use('/api/content', contentRoutes);
   app.use('/api/bookings', bookingsRoutes);
   app.use('/api/inquiries', inquiriesRoutes);
-  app.use('/api/auth', authRoutes);
   app.use('/api/admin', adminRoutes);
 
   // Headless Kwentra + on-site payments (zero guest redirects)

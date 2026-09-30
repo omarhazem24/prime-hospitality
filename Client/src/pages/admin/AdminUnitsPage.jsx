@@ -1,524 +1,383 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Home, Pencil, Plus, RefreshCw, Star } from 'lucide-react';
 import api from '../../api/client';
-import {
-  AdminPageHeader,
-  MoveButtons,
-  reorderList,
-  AspectHint,
-} from '../../components/admin/AdminUi';
+import { AdminPageHeader, MoveButtons, reorderList } from '../../components/admin/AdminUi';
+import { Badge, ConfirmDialog, EmptyState, SearchInput, StatusChips, Tabs, useToast } from '../../components/admin/kit';
+import UnitEditor, { kwentraMessage } from '../../components/admin/UnitEditor';
+import { cn } from '../../utils/cn';
 
-const emptyUnit = {
-  title: '',
-  slug: '',
-  compoundId: '',
-  city: '',
-  propertyType: 'Apartment',
-  bedrooms: 2,
-  bathrooms: 2,
-  areaSqm: 100,
-  maxGuests: 4,
-  pricePerNight: 10000,
-  currency: 'EGP',
-  featured: false,
-  published: true,
-  description: '',
-  amenities: '',
-  images: [],
-  driveFolderUrl: '',
-  kwentraRoomTypeId: '',
+const STATUS = {
+  all: () => true,
+  published: (u) => u.published !== false,
+  hidden: (u) => u.published === false,
+  featured: (u) => u.featured,
+  linked: (u) => Boolean(u.kwentraRoomTypeId),
+  unlinked: (u) => !u.kwentraRoomTypeId,
 };
 
+const STATUS_LABELS = [
+  ['all', 'All'],
+  ['published', 'Published'],
+  ['hidden', 'Hidden'],
+  ['featured', 'Featured'],
+  ['linked', 'Kwentra'],
+  ['unlinked', 'Website only'],
+];
+
 export default function AdminUnitsPage() {
+  const toast = useToast();
   const [items, setItems] = useState([]);
   const [home, setHome] = useState([]);
   const [compounds, setCompounds] = useState([]);
-  const [form, setForm] = useState(emptyUnit);
-  const [editingId, setEditingId] = useState(null);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [driveBusy, setDriveBusy] = useState(false);
-  const [tab, setTab] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('list');
+  const [status, setStatus] = useState('all');
+  const [params] = useSearchParams();
+  const [propertyFilter, setPropertyFilter] = useState(() => params.get('property') || '');
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(() => new Set());
+  const [editor, setEditor] = useState({ open: false, unit: null });
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   async function load() {
-    const [unitsData, compoundsData] = await Promise.all([
-      api.adminGetUnits(),
-      api.adminGetCompounds(),
-    ]);
+    const [unitsData, compoundsData] = await Promise.all([api.adminGetUnits(), api.adminGetCompounds()]);
     setItems(unitsData.items || []);
     setHome(unitsData.home || []);
     setCompounds(compoundsData.items || []);
   }
 
   useEffect(() => {
-    load().catch((err) => setError(err.message));
-  }, []);
+    load()
+      .catch((err) => toast.error(err.message))
+      .finally(() => setLoading(false));
+  }, [toast]);
 
-  const editing = useMemo(
-    () => (editingId ? items.find((u) => u.id === editingId) : null),
-    [editingId, items]
-  );
+  const compoundGroups = useMemo(() => {
+    const groups = new Map();
+    for (const c of compounds) {
+      const key = c.region || 'No destination';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(c);
+    }
+    return [...groups.entries()];
+  }, [compounds]);
 
-  useEffect(() => {
-    if (!editing) return;
-    setForm({
-      title: editing.title || '',
-      slug: editing.slug || '',
-      compoundId: editing.compoundId || '',
-      city: editing.city || '',
-      propertyType: editing.propertyType || 'Apartment',
-      bedrooms: editing.bedrooms || 1,
-      bathrooms: editing.bathrooms || 1,
-      areaSqm: editing.areaSqm || 0,
-      maxGuests: editing.maxGuests || 2,
-      pricePerNight: editing.pricePerNight || 0,
-      currency: editing.currency || 'EGP',
-      featured: Boolean(editing.featured),
-      published: editing.published !== false,
-      description: editing.description || '',
-      amenities: (editing.amenities || []).join(', '),
-      images: editing.images || [],
-      driveFolderUrl: editing.driveFolderUrl || '',
-      kwentraRoomTypeId: editing.kwentraRoomTypeId || '',
+  const scoped = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((u) => {
+      if (propertyFilter && u.compoundId !== propertyFilter) return false;
+      if (!q) return true;
+      return [u.title, u.compound, u.destination, u.unitType, u.slug, ...(u.unitNumbers || [])].join(' ').toLowerCase().includes(q);
     });
-  }, [editing]);
+  }, [items, propertyFilter, query]);
 
-  function payloadFromForm() {
-    return {
-      ...form,
-      amenities: String(form.amenities || '')
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-      images: form.images || [],
-      driveFolderUrl: form.driveFolderUrl || '',
-      kwentraRoomTypeId: form.kwentraRoomTypeId || '',
-    };
+  const filtered = useMemo(() => scoped.filter(STATUS[status]), [scoped, status]);
+  const canReorder = view === 'order' && !propertyFilter && !query.trim() && status === 'all';
+  const editorDefaults = useMemo(() => (propertyFilter ? { compoundId: propertyFilter } : {}), [propertyFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every((u) => selected.has(u.id));
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(filtered.map((u) => u.id)));
   }
 
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
+  function toggleOne(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulk(patch, label) {
+    setBulkBusy(true);
     try {
-      const body = payloadFromForm();
-      if (editingId) await api.adminUpdateUnit(editingId, body);
-      else await api.adminCreateUnit(body);
-      setEditingId(null);
-      setForm(emptyUnit);
+      const res = await api.adminBulkUpdateUnits([...selected], patch);
+      toast.success(`${res.updated} unit type(s) ${label}.`);
+      setSelected(new Set());
       await load();
     } catch (err) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
-      setBusy(false);
+      setBulkBusy(false);
     }
   }
 
-  async function toggleFeatured(unit) {
-    await api.adminUpdateUnit(unit.id, { featured: !unit.featured });
-    await load();
-  }
-
-  async function remove(id) {
-    if (!confirm('Delete this unit?')) return;
-    await api.adminDeleteUnit(id);
-    await load();
+  async function quickToggle(unit, patch) {
+    try {
+      await api.adminBulkUpdateUnits([unit.id], patch);
+      await load();
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function moveSearch(index, dir) {
     const next = reorderList(items, index, index + dir);
     setItems(next);
-    await api.adminReorderSearchUnits(next.map((u) => u.id));
+    try {
+      await api.adminReorderSearchUnits(next.map((u) => u.id));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
   async function moveHome(index, dir) {
     const next = reorderList(home, index, index + dir);
     setHome(next);
-    await api.adminReorderHomeUnits(next.map((u) => u.id));
+    try {
+      await api.adminReorderHomeUnits(next.map((u) => u.id));
+    } catch (err) {
+      toast.error(err.message);
+    }
   }
 
-  async function loadDriveFolder() {
-    const url = String(form.driveFolderUrl || '').trim();
-    if (!url) {
-      setError('Paste a Google Drive folder link first');
-      return;
-    }
-    setDriveBusy(true);
-    setError('');
+  async function onSaved(_item, kw) {
+    const [tone, message] = kwentraMessage(kw);
+    toast[tone](message);
+    setEditor({ open: false, unit: null });
+    await load();
+  }
+
+  async function doDelete() {
     try {
-      const data = await api.adminDriveFolderImages(url);
-      const urls = data.urls || (data.images || []).map((i) => i.url);
-      setForm((f) => ({
-        ...f,
-        driveFolderUrl: url,
-        images: urls,
-      }));
+      await api.adminDeleteUnit(confirmDelete.id);
+      toast.success(`Deleted “${confirmDelete.title}”.`);
+      setConfirmDelete(null);
+      setEditor({ open: false, unit: null });
+      await load();
     } catch (err) {
-      setError(err.message || 'Could not load Drive folder');
-    } finally {
-      setDriveBusy(false);
+      toast.error(err.message);
     }
   }
 
   return (
     <div>
       <AdminPageHeader
-        title="Units"
-        lede="Full listing control — create/edit, homepage featured order, and search page order. Unit photos come from a shared Google Drive folder."
+        title="Unit types"
+        lede={`${items.length} unit types · ${items.filter((u) => u.published !== false).length} published. Details come from Kwentra; photos, visibility and ordering are website-only.`}
         actions={
-          <div className="flex gap-2">
-            {['all', 'home', 'form'].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={
-                  tab === t
-                    ? 'bg-prime-night px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-prime-sand'
-                    : 'border border-prime-line px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]'
-                }
-              >
-                {t === 'all' ? 'Search order' : t === 'home' ? 'Home featured' : 'Create / edit'}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2">
+            <Link to="/admin/sync" className="prime-btn-outline">
+              <RefreshCw size={14} /> Import & sync
+            </Link>
+            <button type="button" className="prime-btn" onClick={() => setEditor({ open: true, unit: null })}>
+              <Plus size={14} /> Add unit type
+            </button>
           </div>
         }
       />
-      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
 
-      {tab === 'all' && (
-        <div className="overflow-x-auto border border-prime-line bg-prime-surface">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
-              <tr>
-                <th className="px-3 py-3">Order</th>
-                <th className="px-3 py-3">Title</th>
-                <th className="px-3 py-3">Compound</th>
-                <th className="px-3 py-3">Price</th>
-                <th className="px-3 py-3">Flags</th>
-                <th className="px-3 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((u, index) => (
-                <tr key={u.id} className="border-b border-prime-line/70">
-                  <td className="px-3 py-3">
-                    <MoveButtons
-                      disableUp={index === 0}
-                      disableDown={index === items.length - 1}
-                      onUp={() => moveSearch(index, -1)}
-                      onDown={() => moveSearch(index, 1)}
-                    />
-                  </td>
-                  <td className="px-3 py-3 font-medium">{u.title}</td>
-                  <td className="px-3 py-3 text-prime-muted">{u.compound}</td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {u.pricePerNight} {u.currency}
-                  </td>
-                  <td className="px-3 py-3 text-xs">
-                    {u.featured ? 'Featured · ' : ''}
-                    {u.published === false ? 'Hidden' : 'Published'}
-                  </td>
-                  <td className="px-3 py-3 text-end">
-                    <button
-                      type="button"
-                      className="me-3 text-xs font-semibold uppercase tracking-wider"
-                      onClick={() => {
-                        setEditingId(u.id);
-                        setTab('form');
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="me-3 text-xs font-semibold uppercase tracking-wider text-prime-muted"
-                      onClick={() => toggleFeatured(u)}
-                    >
-                      {u.featured ? 'Unfeature' : 'Feature'}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs font-semibold uppercase tracking-wider text-red-600"
-                      onClick={() => remove(u.id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Tabs
+        tabs={[
+          ['list', 'All unit types'],
+          ['order', 'Search order'],
+          ['home', `Homepage featured (${home.length})`],
+        ]}
+        value={view}
+        onChange={(v) => {
+          setView(v);
+          setSelected(new Set());
+        }}
+      />
 
-      {tab === 'home' && (
-        <div className="space-y-3">
-          <p className="text-sm text-prime-muted">
-            Only featured units appear on the homepage. Reorder them here.
-          </p>
+      {view === 'home' ? (
+        <div className="space-y-2">
+          <p className="mb-3 text-sm text-prime-muted">Order of the “Featured stays” carousel on the homepage. Feature a unit type from its editor or with bulk actions.</p>
           {home.map((u, index) => (
-            <div
-              key={u.id}
-              className="flex flex-wrap items-center justify-between gap-3 border border-prime-line bg-prime-surface px-4 py-3"
-            >
-              <div className="flex items-center gap-3">
-                {u.images?.[0] ? (
-                  <img src={u.images[0]} alt="" className="h-12 w-16 object-cover" referrerPolicy="no-referrer" />
-                ) : null}
-                <div>
-                  <p className="font-medium">{u.title}</p>
-                  <p className="text-xs text-prime-muted">{u.compound}</p>
+            <div key={u.id} className="flex items-center justify-between gap-3 border border-prime-line bg-prime-surface px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="w-6 text-xs tabular-nums text-prime-muted">{index + 1}</span>
+                {u.images?.[0] ? <img src={u.images[0]} alt="" className="h-12 w-16 object-cover" referrerPolicy="no-referrer" /> : null}
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{u.title}</p>
+                  <p className="truncate text-xs text-prime-muted">{u.compound}</p>
                 </div>
               </div>
-              <MoveButtons
-                disableUp={index === 0}
-                disableDown={index === home.length - 1}
-                onUp={() => moveHome(index, -1)}
-                onDown={() => moveHome(index, 1)}
-              />
+              <div className="flex items-center gap-3">
+                <button type="button" className="text-xs font-semibold text-prime-muted hover:text-red-600" onClick={() => quickToggle(u, { featured: false })}>
+                  Remove
+                </button>
+                <MoveButtons disableUp={index === 0} disableDown={index === home.length - 1} onUp={() => moveHome(index, -1)} onDown={() => moveHome(index, 1)} />
+              </div>
             </div>
           ))}
-          {!home.length ? <p className="text-sm text-prime-muted">No featured units yet.</p> : null}
+          {!home.length ? <EmptyState icon={Star} title="No featured unit types" subtitle="Select unit types in the list and choose “Feature”." /> : null}
         </div>
-      )}
-
-      {tab === 'form' && (
-        <form onSubmit={submit} className="border border-prime-line bg-prime-surface p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="font-display text-lg font-bold">
-              {editingId ? 'Edit unit' : 'Create unit'}
-            </h2>
-            {editingId ? (
-              <button
-                type="button"
-                className="text-xs font-semibold uppercase tracking-wider text-prime-muted"
-                onClick={() => {
-                  setEditingId(null);
-                  setForm(emptyUnit);
-                }}
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="sm:col-span-2">
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Title
-              </span>
-              <input
-                className="prime-input"
-                required
-                value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              />
-            </label>
-            <label>
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Slug
-              </span>
-              <input
-                className="prime-input"
-                value={form.slug}
-                placeholder="auto from title"
-                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              />
-            </label>
-            <label>
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Compound
-              </span>
-              <select
-                className="prime-input"
-                value={form.compoundId}
-                onChange={(e) => setForm((f) => ({ ...f, compoundId: e.target.value }))}
-              >
-                <option value="">Select…</option>
-                {compounds.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
+      ) : (
+        <>
+          <div className="mb-4 flex flex-col gap-3">
+            <StatusChips
+              value={status}
+              onChange={setStatus}
+              options={STATUS_LABELS.map(([id, label]) => ({ id, label, count: scoped.filter(STATUS[id]).length }))}
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <select className="prime-input w-auto min-w-[220px]" value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)}>
+                <option value="">All properties</option>
+                {compoundGroups.map(([destination, list]) => (
+                  <optgroup key={destination} label={destination}>
+                    {list.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
-            </label>
-            <label>
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                City
-              </span>
-              <input
-                className="prime-input"
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-              />
-            </label>
-            <label>
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Property type
-              </span>
-              <input
-                className="prime-input"
-                value={form.propertyType}
-                onChange={(e) => setForm((f) => ({ ...f, propertyType: e.target.value }))}
-              />
-            </label>
-            {[
-              ['bedrooms', 'Bedrooms'],
-              ['bathrooms', 'Bathrooms'],
-              ['areaSqm', 'Area m²'],
-              ['maxGuests', 'Max guests'],
-              ['pricePerNight', 'Price / night'],
-            ].map(([key, label]) => (
-              <label key={key}>
-                <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                  {label}
-                </span>
-                <input
-                  className="prime-input"
-                  type="number"
-                  value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: Number(e.target.value) }))}
-                />
-              </label>
-            ))}
-            <label>
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Kwentra room type ID
-              </span>
-              <input
-                className="prime-input"
-                value={form.kwentraRoomTypeId}
-                placeholder="e.g. 3 (from PMS room_type.id)"
-                onChange={(e) => setForm((f) => ({ ...f, kwentraRoomTypeId: e.target.value }))}
-              />
-            </label>
-            <label className="sm:col-span-2">
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Description
-              </span>
-              <textarea
-                className="prime-input min-h-[100px]"
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </label>
-            <label className="sm:col-span-2">
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                Amenities (comma-separated)
-              </span>
-              <input
-                className="prime-input"
-                value={form.amenities}
-                onChange={(e) => setForm((f) => ({ ...f, amenities: e.target.value }))}
-              />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.featured}
-                onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
-              />
-              Featured on homepage
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.published}
-                onChange={(e) => setForm((f) => ({ ...f, published: e.target.checked }))}
-              />
-              Published
-            </label>
+              <SearchInput value={query} onChange={setQuery} placeholder="Search title, type, slug or unit number…" className="min-w-[220px] flex-1" />
+              {view === 'order' && !canReorder ? <span className="text-xs text-prime-muted">Clear filters to reorder.</span> : null}
+            </div>
           </div>
 
-          <div className="mt-6 border-t border-prime-line pt-6">
-            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-              Gallery — Google Drive folder
-            </p>
-            <AspectHint ratio="4:3 cover · 3:2 or 4:3 gallery" size="first image = listing card" />
-            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-prime-muted">
-              Unit details pull from Kwentra when linked. Photos stay here — share a Drive folder as{' '}
-              <span className="font-medium text-prime-ink">Anyone with the link</span>, paste the URL,
-              then load. Set <span className="font-medium text-prime-ink">Kwentra room type ID</span> so
-              availability and bookings sync.
-            </p>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch">
-              <input
-                type="url"
-                className="prime-input flex-1"
-                placeholder="https://drive.google.com/drive/folders/…"
-                value={form.driveFolderUrl}
-                onChange={(e) => setForm((f) => ({ ...f, driveFolderUrl: e.target.value }))}
-              />
-              <button
-                type="button"
-                disabled={driveBusy}
-                onClick={loadDriveFolder}
-                className="shrink-0 border border-prime-night bg-prime-night px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-prime-sand disabled:opacity-60"
-              >
-                {driveBusy ? 'Loading…' : 'Load photos'}
+          {selected.size ? (
+            <div className="sticky top-14 z-20 mb-3 flex flex-wrap items-center gap-2 border border-prime-night bg-prime-night px-4 py-2.5 text-prime-sand">
+              <span className="me-2 text-sm">{selected.size} selected</span>
+              {[
+                [{ published: true }, 'Publish', 'published'],
+                [{ published: false }, 'Hide', 'hidden'],
+                [{ featured: true }, 'Feature', 'featured'],
+                [{ featured: false }, 'Unfeature', 'removed from the homepage'],
+              ].map(([patch, label, done]) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => bulk(patch, done)}
+                  className="border border-white/30 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] hover:border-white disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+              <button type="button" className="ms-auto text-xs underline underline-offset-4" onClick={() => setSelected(new Set())}>
+                Clear
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(form.images || []).map((src, i) => (
-                <div key={`${src}-${i}`} className="relative">
-                  <img
-                    src={src}
-                    alt=""
-                    className="h-20 w-28 border border-prime-line bg-prime-mist object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                  <button
-                    type="button"
-                    className="absolute end-1 top-1 bg-black/70 px-1.5 text-[10px] text-white"
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        images: f.images.filter((_, idx) => idx !== i),
-                      }))
-                    }
-                  >
-                    ×
-                  </button>
-                  <div className="absolute bottom-1 start-1 flex gap-0.5">
-                    <button
-                      type="button"
-                      disabled={i === 0}
-                      className="bg-black/70 px-1 text-[10px] text-white disabled:opacity-30"
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          images: reorderList(f.images, i, i - 1),
-                        }))
-                      }
-                    >
-                      ←
-                    </button>
-                    <button
-                      type="button"
-                      disabled={i === form.images.length - 1}
-                      className="bg-black/70 px-1 text-[10px] text-white disabled:opacity-30"
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          images: reorderList(f.images, i, i + 1),
-                        }))
-                      }
-                    >
-                      →
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {form.images?.length ? (
-              <p className="mt-2 text-xs text-prime-muted">{form.images.length} photo(s) loaded</p>
-            ) : null}
-          </div>
+          ) : null}
 
-          <button type="submit" className="prime-btn mt-6" disabled={busy}>
-            {busy ? 'Saving…' : editingId ? 'Update unit' : 'Create unit'}
-          </button>
-        </form>
+          {loading ? (
+            <p className="text-sm text-prime-muted">Loading…</p>
+          ) : filtered.length ? (
+            <div className="overflow-x-auto border border-prime-line bg-prime-surface">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
+                  <tr>
+                    <th className="w-10 px-3 py-3">
+                      {view === 'order' ? null : <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />}
+                    </th>
+                    <th className="px-3 py-3">Unit type</th>
+                    <th className="px-3 py-3">Property</th>
+                    <th className="px-3 py-3">Units</th>
+                    <th className="px-3 py-3">From price</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((u) => {
+                    const index = items.indexOf(u);
+                    return (
+                      <tr key={u.id} className={cn('border-b border-prime-line/70 hover:bg-prime-mist/50', selected.has(u.id) && 'bg-prime-gold/5')}>
+                        <td className="px-3 py-3">
+                          {view === 'order' ? (
+                            canReorder ? (
+                              <MoveButtons
+                                disableUp={index === 0}
+                                disableDown={index === items.length - 1}
+                                onUp={() => moveSearch(index, -1)}
+                                onDown={() => moveSearch(index, 1)}
+                              />
+                            ) : (
+                              <span className="text-xs tabular-nums text-prime-muted">{index + 1}</span>
+                            )
+                          ) : (
+                            <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleOne(u.id)} aria-label={`Select ${u.title}`} />
+                          )}
+                        </td>
+                        <td className="px-3 py-3">
+                          <button type="button" className="flex items-center gap-3 text-start" onClick={() => setEditor({ open: true, unit: u })}>
+                            <span className="h-11 w-14 shrink-0 overflow-hidden border border-prime-line bg-prime-mist">
+                              {u.images?.[0] ? <img src={u.images[0]} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" /> : null}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block font-medium hover:underline">{u.title}</span>
+                              <span className="block text-xs text-prime-muted">
+                                {[u.unitType, u.areaSqm ? `${u.areaSqm} m²` : '', u.maxGuests ? `${u.maxGuests} guests` : '', u.bedType].filter(Boolean).join(' · ')}
+                              </span>
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-3 py-3 text-prime-muted">
+                          <span className="block text-prime-ink">{u.compound || '—'}</span>
+                          <span className="text-xs">{u.destination || u.region}</span>
+                        </td>
+                        <td className="px-3 py-3 tabular-nums" title={(u.unitNumbers || []).join(', ')}>
+                          {u.roomCount ?? (u.unitNumbers?.length || '—')}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">{u.pricePerNight ? `${Number(u.pricePerNight).toLocaleString()} ${u.currency}` : '—'}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            <button type="button" onClick={() => quickToggle(u, { published: u.published === false })} title="Toggle visibility">
+                              <Badge tone={u.published === false ? 'gray' : 'green'}>{u.published === false ? 'Hidden' : 'Published'}</Badge>
+                            </button>
+                            {u.featured ? <Badge tone="gold">Featured</Badge> : null}
+                            {u.kwentraRoomTypeId ? <Badge tone="blue">Kwentra #{u.kwentraRoomTypeId}</Badge> : <Badge>Website only</Badge>}
+                            {!u.images?.length ? <Badge tone="red">No photos</Badge> : null}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-end">
+                          <button
+                            type="button"
+                            className="inline-grid h-8 w-8 place-items-center border border-prime-line hover:border-prime-ink"
+                            onClick={() => setEditor({ open: true, unit: u })}
+                            aria-label={`Edit ${u.title}`}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Home}
+              title={items.length ? 'No unit types match' : 'No unit types yet'}
+              subtitle={items.length ? 'Try another filter or search.' : 'Sync from Kwentra, import a fact sheet, or add one by hand.'}
+              action={
+                <button type="button" className="prime-btn" onClick={() => setEditor({ open: true, unit: null })}>
+                  <Plus size={14} /> Add unit type
+                </button>
+              }
+            />
+          )}
+        </>
       )}
+
+      <UnitEditor
+        open={editor.open}
+        unit={editor.unit}
+        compounds={compounds}
+        compoundGroups={compoundGroups}
+        defaults={editorDefaults}
+        onClose={() => setEditor({ open: false, unit: null })}
+        onSaved={onSaved}
+        onDelete={(u) => setConfirmDelete(u)}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        danger
+        title="Delete unit type?"
+        message={confirmDelete ? `“${confirmDelete.title}” will be removed from the website. It is not deleted in Kwentra — a later sync may bring it back; hide it instead to keep it off the site.` : ''}
+        confirmText="Delete"
+        onConfirm={doDelete}
+        onClose={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

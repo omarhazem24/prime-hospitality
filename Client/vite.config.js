@@ -13,4 +13,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    target: 'es2020',
+    cssMinify: true,
+    rollupOptions: {
+      output: {
+        // React + router rarely change — keep them in their own long-cached chunk
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-dom/client', 'react-router', 'react-router-dom'],
+        },
+      },
+    },
+  },
 });

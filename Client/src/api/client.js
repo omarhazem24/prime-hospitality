@@ -1,5 +1,5 @@
 /**
- * Guest + Admin API client — talks to Prime Server (/api).
+ * Public site + staff (admin) API client — talks to Prime Server (/api).
  */
 
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
@@ -18,8 +18,7 @@ function buildUrl(path, params) {
 async function request(path, { method = 'GET', params, body, token, formData } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined && !formData) headers['Content-Type'] = 'application/json';
-  const auth = token || localStorage.getItem('prime_guest_token');
-  if (auth) headers.Authorization = `Bearer ${auth}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(buildUrl(path, params), {
     method,
@@ -40,6 +39,22 @@ async function request(path, { method = 'GET', params, body, token, formData } =
 function adminRequest(path, options = {}) {
   const token = localStorage.getItem(ADMIN_TOKEN_KEY);
   return request(path, { ...options, token });
+}
+
+const publicCache = new Map();
+const PUBLIC_TTL_MS = 60_000;
+
+/** Site content several components ask for on the same page — fetch once per minute. */
+function cachedRequest(path, params) {
+  const key = `${path}?${JSON.stringify(params || {})}`;
+  const hit = publicCache.get(key);
+  if (hit && Date.now() - hit.at < PUBLIC_TTL_MS) return hit.promise;
+  const promise = request(path, { params }).catch((err) => {
+    publicCache.delete(key);
+    throw err;
+  });
+  publicCache.set(key, { at: Date.now(), promise });
+  return promise;
 }
 
 export const api = {
@@ -68,7 +83,7 @@ export const api = {
   },
 
   getDestinations(params = {}) {
-    return request('/api/destinations', { params });
+    return cachedRequest('/api/destinations', params);
   },
 
   getDestinationById(id) {
@@ -76,27 +91,31 @@ export const api = {
   },
 
   getMeta() {
-    return request('/api/content/meta');
+    return cachedRequest('/api/content/meta');
   },
 
   getPartners() {
-    return request('/api/content/partners');
+    return cachedRequest('/api/content/partners');
   },
 
   getTrust() {
-    return request('/api/content/trust');
+    return cachedRequest('/api/content/trust');
   },
 
   getFaqs() {
-    return request('/api/content/faqs');
+    return cachedRequest('/api/content/faqs');
   },
 
   getSlideshow() {
-    return request('/api/content/slideshow');
+    return cachedRequest('/api/content/slideshow');
   },
 
   getPixels() {
     return request('/api/content/pixels');
+  },
+
+  getSite() {
+    return request('/api/content/site');
   },
 
   async getFeatured(limit = 8) {
@@ -115,18 +134,6 @@ export const api = {
 
   sendPartnerInquiry(payload) {
     return request('/api/inquiries/partner', { method: 'POST', body: payload });
-  },
-
-  signIn(payload) {
-    return request('/api/auth/sign-in', { method: 'POST', body: payload });
-  },
-
-  signUp(payload) {
-    return request('/api/auth/sign-up', { method: 'POST', body: payload });
-  },
-
-  me() {
-    return request('/api/auth/me');
   },
 
   /* ——— Admin ——— */
@@ -174,6 +181,26 @@ export const api = {
     return adminRequest('/api/admin/slideshow/reorder', { method: 'PATCH', body: { ids } });
   },
 
+  adminGetDestinations() {
+    return adminRequest('/api/admin/destinations');
+  },
+  adminCreateDestination(body) {
+    return adminRequest('/api/admin/destinations', { method: 'POST', body });
+  },
+  adminUpdateDestination(id, body) {
+    return adminRequest(`/api/admin/destinations/${id}`, { method: 'PATCH', body });
+  },
+  adminDeleteDestination(id) {
+    return adminRequest(`/api/admin/destinations/${id}`, { method: 'DELETE' });
+  },
+  adminReorderDestinations(ids) {
+    return adminRequest('/api/admin/destinations/reorder', { method: 'PATCH', body: { ids } });
+  },
+
+  adminGetBookings() {
+    return adminRequest('/api/admin/bookings');
+  },
+
   adminGetCompounds() {
     return adminRequest('/api/admin/compounds');
   },
@@ -207,6 +234,39 @@ export const api = {
   },
   adminReorderSearchUnits(ids) {
     return adminRequest('/api/admin/units/reorder-search', { method: 'PATCH', body: { ids } });
+  },
+  adminBulkUpdateUnits(ids, patch) {
+    return adminRequest('/api/admin/units/bulk', { method: 'PATCH', body: { ids, patch } });
+  },
+
+  adminGetSite() {
+    return adminRequest('/api/admin/site');
+  },
+  /** Send one or more whole sections: business, announcement, home, pages, copy, seo, tracking */
+  adminSaveSite(sections) {
+    return adminRequest('/api/admin/site', { method: 'PUT', body: sections });
+  },
+  adminGetContent() {
+    return adminRequest('/api/admin/content');
+  },
+  adminSaveContent(body) {
+    return adminRequest('/api/admin/content', { method: 'PUT', body });
+  },
+
+  adminKwentraStatus() {
+    return adminRequest('/api/admin/kwentra/status');
+  },
+  adminKwentraSync() {
+    return adminRequest('/api/admin/kwentra/sync', { method: 'POST' });
+  },
+  adminImportInventory(file, { apply = false, destinationId = '' } = {}) {
+    const fd = new FormData();
+    fd.append('file', file);
+    return adminRequest('/api/admin/import/inventory', {
+      method: 'POST',
+      formData: fd,
+      params: { apply: apply ? '1' : '0', destinationId },
+    });
   },
 
   adminGetSettings() {

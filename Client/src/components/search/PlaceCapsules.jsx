@@ -1,30 +1,45 @@
-import { SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 /**
- * Capsule row: All | places in the current destination | Filters
- * Places = compounds filtered by selected region (destination).
+ * Capsule row: [← back] | All | places | Filters
+ * With no destination selected, places are destinations; inside a destination they are its properties.
  */
 export default function PlaceCapsules({
   places,
   selectedId,
   onSelect,
   onOpenFilters,
+  allLabel = 'All',
+  emptyLabel = 'No places here yet',
+  backLabel,
+  onBack,
   className,
 }) {
   return (
     <div className={cn('flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-prime-line bg-prime-surface px-3.5 py-2 text-sm font-medium text-prime-muted transition hover:border-prime-ink/40 hover:text-prime-ink"
+        >
+          <ArrowLeft size={14} className="rtl:rotate-180" aria-hidden />
+          {backLabel}
+        </button>
+      ) : null}
+
       <button
         type="button"
         onClick={() => onSelect('')}
         className={cn(
-          'shrink-0 rounded-full px-4 py-2 text-sm font-medium transition',
+          'shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition',
           !selectedId
             ? 'bg-prime-ink text-prime-sand'
             : 'border border-prime-line bg-prime-surface text-prime-ink hover:border-prime-ink/40'
         )}
       >
-        All
+        {allLabel}
       </button>
 
       <span className="mx-1 h-5 w-px shrink-0 bg-prime-line" aria-hidden />
@@ -45,18 +60,21 @@ export default function PlaceCapsules({
               )}
             >
               {place.name}
+              {place.count != null ? (
+                <span className={cn('ms-1.5 text-xs', active ? 'text-white/60' : 'text-prime-muted')}>
+                  {place.count}
+                </span>
+              ) : null}
             </button>
           );
         })}
-        {!places.length ? (
-          <span className="shrink-0 text-sm text-prime-muted">No places in this destination</span>
-        ) : null}
+        {!places.length ? <span className="shrink-0 text-sm text-prime-muted">{emptyLabel}</span> : null}
       </div>
 
       <button
         type="button"
         onClick={onOpenFilters}
-        className="ms-auto flex shrink-0 items-center gap-2 rounded-full border border-prime-line bg-prime-surface px-4 py-2 text-sm font-medium text-prime-ink transition hover:border-prime-ink/40"
+        className="ms-auto flex shrink-0 items-center gap-2 rounded-full border border-prime-line bg-prime-surface px-4 py-2 text-sm font-medium text-prime-ink transition hover:border-prime-ink/40 md:hidden"
       >
         <SlidersHorizontal size={14} strokeWidth={1.8} />
         Filters

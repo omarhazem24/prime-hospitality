@@ -2,8 +2,11 @@ export const brand = {
   id: 'prime',
   name: 'Prime Hospitality',
   shortName: 'Prime',
-  tagline: 'Prime stays for Prime customers.',
-  logo: '/brand/logo-transparent.png',
+  tagline: 'Prime stays for Prime customers.',  logo: '/brand/logo-transparent.png',
+  /** White letters + gold key — for dark / photo backgrounds */
+  logoLight: '/brand/logo-light.png',
+  /** Charcoal letters + gold key — for light backgrounds */
+  logoDark: '/brand/logo-dark.png',
   logoMark: '/brand/logo-prime-mark.png',
   logoFull: '/brand/Hospitality.png',
   domain: import.meta.env.VITE_SITE_URL || 'https://primehospitality.com',

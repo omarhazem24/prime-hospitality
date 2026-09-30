@@ -1,23 +1,29 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Globe, Heart, Menu, Moon, Sun, User, X } from 'lucide-react';
-import { brand } from '../../theme/brand';
-import { useAuth } from '../../context/AuthContext';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { ArrowUpRight, Heart, Moon, Sun, X } from 'lucide-react';
+import { brand, whatsappHref } from '../../theme/brand';
+import { useAdminAuth } from '../../context/AdminAuthContext';
 import { useLocale } from '../../context/LocaleContext';
+import { activeAnnouncement, useSite } from '../../context/SiteContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useWishlist } from '../../context/WishlistContext';
 import { cn } from '../../utils/cn';
+import { sizedSrc } from '../../utils/img';
 
-const NAV = [
+const MENU = [
   { labelKey: 'nav.stays', to: '/search' },
   { labelKey: 'nav.compounds', to: '/compounds' },
   { labelKey: 'nav.about', to: '/about' },
-  { labelKey: 'nav.faq', to: '/faq' },
   { labelKey: 'nav.becomePartner', to: '/owners' },
+  { labelKey: 'nav.faq', to: '/faq' },
+  { labelKey: 'nav.contact', to: '/contact' },
 ];
 
-function ThemeToggle({ onDark }) {
-  const { isDark, toggleTheme } = useTheme();
+const MENU_IMAGE =
+  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1200&q=72';
 
+function ThemeToggle() {
+  const { isDark, toggleTheme } = useTheme();
   return (
     <button
       type="button"
@@ -26,216 +32,304 @@ function ThemeToggle({ onDark }) {
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       onClick={toggleTheme}
       data-on={isDark ? 'true' : 'false'}
-      className={cn(
-        'prime-theme-toggle',
-        onDark
-          ? 'border-white/35 bg-white/15 data-[on=true]:border-prime-gold/60 data-[on=true]:bg-prime-night/80'
-          : 'border-prime-line bg-prime-mist data-[on=true]:border-prime-gold data-[on=true]:bg-prime-night'
-      )}
+      className="prime-theme-toggle border-white/25 bg-white/10"
     >
       <span className="prime-theme-toggle__thumb">
-        {isDark ? <Moon size={12} strokeWidth={2.25} /> : <Sun size={12} strokeWidth={2.25} />}
+        {isDark ? <Moon size={11} strokeWidth={2.25} /> : <Sun size={11} strokeWidth={2.25} />}
       </span>
     </button>
   );
 }
 
+const BAR_TONES = {
+  night: 'bg-[#221f20] text-white',
+  gold: 'bg-prime-gold text-[#221f20]',
+  sand: 'bg-prime-mist text-prime-ink',
+};
+const BAR_DISMISS_KEY = 'prime.announcement.dismissed';
+
+function AnnouncementBar({ bar, collapsed, onDismiss }) {
+  const external = /^https?:/i.test(bar.href);
+  const linkCls = 'ms-2 underline decoration-current/40 underline-offset-4 transition hover:decoration-current';
+  return (
+    <div
+      className={cn(
+        'relative grid transition-[grid-template-rows] duration-500 ease-prime',
+        collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
+      )}
+    >
+      <div className="overflow-hidden">
+        <div className={cn('flex h-9 items-center justify-center px-10 text-center text-[11.5px] tracking-[0.06em]', BAR_TONES[bar.tone] || BAR_TONES.night)}>
+          <p className="truncate">
+            {bar.text}
+            {bar.href && bar.linkLabel ? (
+              external ? (
+                <a href={bar.href} target="_blank" rel="noreferrer" className={linkCls}>
+                  {bar.linkLabel}
+                </a>
+              ) : (
+                <Link to={bar.href} className={linkCls}>
+                  {bar.linkLabel}
+                </Link>
+              )
+            ) : null}
+          </p>
+          <button
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss announcement"
+            className="absolute end-2 grid h-7 w-7 place-items-center opacity-70 transition hover:opacity-100"
+          >
+            <X size={14} strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <span className="relative block h-3 w-6" aria-hidden>
+      <span className="absolute inset-x-0 top-0 h-px bg-current" />
+      <span className="absolute bottom-0 start-0 h-px w-4 bg-current transition-all duration-500 ease-prime group-hover:w-6" />
+    </span>
+  );
+}
+
 export default function Header({ overHero = false }) {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { user } = useAuth();
   const { t, locale, toggleLocale } = useLocale();
-  const navigate = useNavigate();
+  const { isAdmin } = useAdminAuth();
+  const { ids } = useWishlist();
   const { pathname } = useLocation();
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeRef = useRef(null);
+  const { site } = useSite();
+  const bar = activeAnnouncement(site.announcement, locale);
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem(BAR_DISMISS_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
+  const showBar = Boolean(bar) && dismissed !== bar.text;
+
+  function dismissBar() {
+    setDismissed(bar.text);
+    try {
+      sessionStorage.setItem(BAR_DISMISS_KEY, bar.text);
+    } catch {
+      /* private mode — dismissed for this page view only */
+    }
+  }
 
   useEffect(() => {
-    if (!overHero) return undefined;
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setScrolled(window.scrollY > 40));
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [overHero]);
-
-  useEffect(() => {
-    document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => {
-      document.body.style.overflow = '';
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
     };
-  }, [mobileOpen]);
+  }, []);
 
   useEffect(() => {
-    setMobileOpen(false);
+    setMenuOpen(false);
   }, [pathname]);
 
-  /** Light bar + dark chrome (search etc.) vs transparent hero + white chrome */
-  const solid = !overHero || scrolled;
-  const onDark = !solid;
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeRef.current?.focus();
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const transparent = overHero && !scrolled;
+  const staffTo = isAdmin ? '/admin' : '/admin/login';
 
   return (
     <>
       <header
         className={cn(
-          'prime-header-shell',
-          overHero ? 'fixed' : 'sticky',
-          'inset-x-0 top-0 z-50 transition-all duration-500',
-          solid
-            ? 'border-b border-prime-line/80 bg-prime-sand/95 shadow-[0_1px_0_rgba(34,31,32,0.06)] backdrop-blur-md'
-            : 'bg-transparent'
+          'prime-header-shell fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,color] duration-500 ease-prime',
+          transparent
+            ? 'bg-transparent text-white'
+            : 'bg-prime-sand/95 text-prime-ink shadow-[0_1px_0_rgba(34,31,32,0.08)] backdrop-blur-md'
         )}
       >
-        <div className="relative mx-auto flex h-16 max-w-prime items-center justify-between gap-2 px-4 sm:h-[80px] sm:gap-4 sm:px-6 md:h-[88px] md:px-8">
-          <Link to="/" className="relative z-10 flex min-w-0 shrink-0 items-center">
+        {transparent ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/35 to-transparent" />
+        ) : null}
+        {showBar ? <AnnouncementBar bar={bar} collapsed={scrolled} onDismiss={dismissBar} /> : null}
+        <div className="prime-container relative grid h-[var(--prime-header-h)] grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="flex items-center gap-8">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-expanded={menuOpen}
+              aria-controls="prime-menu"
+              className="group -ms-2 inline-flex items-center gap-3 p-2 text-[11px] font-medium uppercase tracking-[0.28em]"
+            >
+              <MenuIcon />
+              <span className="hidden sm:inline">{t('nav.menu')}</span>
+            </button>
+          </div>
+
+          <Link to="/" className="block" aria-label={brand.name}>
             <img
-              src={brand.logo}
+              src={transparent ? brand.logoLight : brand.logoDark}
               alt={brand.name}
-              className={cn(
-                'h-9 w-auto max-w-[140px] object-contain transition sm:h-12 sm:max-w-none md:h-14',
-                solid && 'brightness-0'
-              )}
+              width="640"
+              height="228"
+              className="h-9 w-auto sm:h-10 md:h-12"
             />
           </Link>
 
-          <nav className="pointer-events-none absolute inset-x-0 hidden items-center justify-center gap-0.5 xl:flex">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    'pointer-events-auto relative px-2.5 py-2 text-[11px] font-bold uppercase tracking-[0.2em] transition 2xl:px-3',
-                    solid
-                      ? isActive
-                        ? 'text-prime-ink'
-                        : 'text-prime-ink/65 hover:text-prime-ink'
-                      : isActive
-                        ? 'text-white'
-                        : 'text-white/75 hover:text-white'
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    {t(item.labelKey)}
-                    <span
-                      className={cn(
-                        'absolute inset-x-2.5 -bottom-0.5 h-px origin-center scale-x-0 bg-prime-gold transition duration-300',
-                        isActive && 'scale-x-100'
-                      )}
-                    />
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="relative z-10 flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center justify-end gap-1 sm:gap-3">
             <button
               type="button"
               onClick={toggleLocale}
-              className={cn(
-                'hidden items-center gap-1.5 px-2 py-1.5 text-sm font-bold transition sm:inline-flex',
-                solid
-                  ? 'text-prime-ink/70 hover:text-prime-ink'
-                  : 'text-white/80 hover:text-white'
-              )}
+              className="hidden p-2 text-[11px] font-medium uppercase tracking-[0.2em] opacity-80 transition-opacity hover:opacity-100 md:inline-flex"
               aria-label="Toggle language"
             >
-              <Globe size={15} strokeWidth={2} />
               {locale === 'en' ? 'عربي' : 'EN'}
             </button>
-
-            <ThemeToggle onDark={onDark} />
-
-            <button
-              type="button"
-              onClick={() => navigate('/wishlist')}
-              className={cn(
-                'hidden p-2 transition sm:inline-flex',
-                solid
-                  ? 'text-prime-ink hover:text-prime-gold-deep'
-                  : 'text-white hover:text-prime-gold'
-              )}
+            <Link
+              to="/wishlist"
+              className="relative inline-flex p-2 opacity-85 transition-opacity hover:opacity-100"
               aria-label={t('nav.wishlist')}
             >
-              <Heart size={17} strokeWidth={2} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate(user ? '/account' : '/sign-in')}
+              <Heart size={18} strokeWidth={1.5} />
+              {ids.length ? (
+                <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-prime-gold px-1 text-[9px] font-semibold text-[#221f20]">
+                  {ids.length}
+                </span>
+              ) : null}
+            </Link>
+            <Link
+              to="/search"
               className={cn(
-                'hidden items-center gap-2 border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] transition md:inline-flex',
-                solid
-                  ? 'border-prime-ink/25 text-prime-ink hover:border-prime-gold hover:text-prime-gold-deep'
-                  : 'border-white/30 text-white hover:border-prime-gold hover:text-prime-gold'
+                'ms-1 hidden min-h-[2.75rem] items-center px-5 text-[11px] font-medium uppercase tracking-[0.24em] transition duration-300 sm:inline-flex',
+                transparent
+                  ? 'border border-white/50 hover:bg-white hover:text-[#221f20]'
+                  : 'bg-prime-ink text-prime-sand hover:bg-prime-gold-deep'
               )}
             >
-              <User size={14} strokeWidth={2} />
-              <span className="hidden lg:inline">{user ? t('nav.account') : t('nav.signIn')}</span>
-            </button>
-
-            <button
-              type="button"
-              className={cn(
-                'inline-flex p-2 xl:hidden',
-                solid ? 'text-prime-ink' : 'text-white'
-              )}
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            >
-              {mobileOpen ? <X size={22} strokeWidth={2} /> : <Menu size={22} strokeWidth={2} />}
-            </button>
+              {t('nav.book')}
+            </Link>
           </div>
         </div>
       </header>
 
-      {mobileOpen && (
-        <div className="prime-header-shell fixed inset-0 z-40 overflow-y-auto overscroll-contain bg-prime-sand pt-16 sm:pt-[80px] xl:hidden">
-          <nav className="flex flex-col gap-1 px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] py-6">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className="border-b border-prime-line/60 py-4 font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink"
-                onClick={() => setMobileOpen(false)}
-              >
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-            <Link
-              to="/contact"
-              className="border-b border-prime-line/60 py-4 font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink"
-              onClick={() => setMobileOpen(false)}
-            >
-              {t('nav.contact')}
-            </Link>
-            <div className="mt-6 flex flex-wrap items-center gap-4">
+      {!overHero ? (
+        <div aria-hidden className={showBar ? 'h-[calc(var(--prime-header-h)+2.25rem)]' : 'h-[var(--prime-header-h)]'} />
+      ) : null}
+
+      {menuOpen ? (
+        <div
+          id="prime-menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('nav.menu')}
+          className="fixed inset-0 z-[90] flex bg-[#221f20] text-white"
+          style={{ animation: 'primeMenuIn 0.7s var(--prime-ease) both' }}
+        >
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+            <div className="prime-container grid h-[var(--prime-header-h)] shrink-0 grid-cols-[1fr_auto_1fr] items-center">
               <button
+                ref={closeRef}
                 type="button"
-                onClick={toggleLocale}
-                className="inline-flex items-center gap-1.5 text-sm font-bold text-prime-ink/70 sm:hidden"
+                onClick={() => setMenuOpen(false)}
+                className="-ms-2 inline-flex w-fit items-center gap-3 p-2 text-[11px] font-medium uppercase tracking-[0.28em]"
               >
-                <Globe size={15} />
-                {locale === 'en' ? 'عربي' : 'EN'}
+                <X size={20} strokeWidth={1.25} />
+                <span className="hidden sm:inline">{t('nav.close')}</span>
               </button>
-              <Link
-                to="/wishlist"
-                className="text-sm font-bold text-prime-ink/70 sm:hidden"
-                onClick={() => setMobileOpen(false)}
-              >
-                {t('nav.wishlist')}
+              <Link to="/" onClick={() => setMenuOpen(false)} aria-label={brand.name}>
+                <img src={brand.logoLight} alt={brand.name} width="640" height="228" className="h-9 w-auto sm:h-10 md:h-12" />
               </Link>
-              <Link
-                to={user ? '/account' : '/sign-in'}
-                className="text-sm font-bold text-prime-ink md:hidden"
-                onClick={() => setMobileOpen(false)}
-              >
-                {user ? t('nav.account') : t('nav.signIn')}
-              </Link>
+              <span />
             </div>
-          </nav>
+
+            <nav className="prime-container flex flex-1 flex-col justify-center py-10" aria-label="Menu">
+              <ol className="space-y-1 sm:space-y-2">
+                {MENU.map((item, i) => (
+                  <li
+                    key={item.to}
+                    className="prime-fade-up"
+                    style={{ animationDelay: `${120 + i * 60}ms` }}
+                  >
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) =>
+                        cn(
+                          'group flex items-baseline gap-5 py-1.5 font-display text-[clamp(2.1rem,6.5vw,4.25rem)] font-medium leading-[1.05] transition-colors duration-300',
+                          isActive ? 'text-prime-gold-soft' : 'text-white hover:text-prime-gold-soft'
+                        )
+                      }
+                    >
+                      <span className="font-sans text-[11px] font-medium tracking-[0.2em] text-white/40">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="transition-transform duration-500 ease-prime group-hover:translate-x-2 rtl:group-hover:-translate-x-2">
+                        {t(item.labelKey)}
+                      </span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+
+            <div className="prime-container shrink-0 border-t border-white/10 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+              <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/60">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <a href={`mailto:${brand.email}`} className="transition hover:text-white">
+                    {brand.email}
+                  </a>
+                  <a href={whatsappHref()} target="_blank" rel="noreferrer" className="transition hover:text-white">
+                    WhatsApp
+                  </a>
+                  <Link to={staffTo} className="inline-flex items-center gap-1 transition hover:text-white">
+                    {isAdmin ? t('nav.staffDashboard') : t('nav.staffSignIn')}
+                    <ArrowUpRight size={13} />
+                  </Link>
+                </div>
+                <div className="flex items-center gap-5">
+                  <button type="button" onClick={toggleLocale} className="transition hover:text-white">
+                    {locale === 'en' ? 'عربي' : 'English'}
+                  </button>
+                  <ThemeToggle />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative hidden w-[38%] max-w-xl overflow-hidden lg:block">
+            <img
+              src={sizedSrc(MENU_IMAGE, 1080)}
+              alt=""
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#221f20] via-transparent to-transparent rtl:bg-gradient-to-l" />
+            <p className="absolute inset-x-10 bottom-10 font-display text-3xl font-medium italic leading-snug text-white/90">
+              {brand.tagline}
+            </p>
+          </div>
         </div>
-      )}
+      ) : null}
     </>
   );
 }

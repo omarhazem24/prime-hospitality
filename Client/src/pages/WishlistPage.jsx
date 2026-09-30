@@ -1,0 +1,66 @@
+import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import Header from '../components/layout/Header';
+import Footer from '../components/layout/Footer';
+import ListingCard, { ListingCardSkeleton } from '../components/ListingCard';
+import PageHero from '../components/ui/PageHero';
+import { useWishlist } from '../context/WishlistContext';
+import api from '../api/client';
+
+/** Saved stays live in this browser only (localStorage) — no guest account needed */
+export default function WishlistPage() {
+  const { ids } = useWishlist();
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getListings()
+      .then((res) => {
+        if (!cancelled) setItems((res.items || []).filter((l) => ids.includes(l.id)));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ids]);
+
+  return (
+    <div>
+      <Header />
+      <main>
+        <PageHero eyebrow="Saved" title="Your wishlist." lede="Homes you’re holding onto for the next trip — saved on this device." />
+        <section className="prime-container pb-28">
+          {loading && ids.length ? (
+            <div className="grid gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8 xl:grid-cols-4">
+              {ids.slice(0, 4).map((id) => (
+                <ListingCardSkeleton key={id} />
+              ))}
+            </div>
+          ) : !items.length ? (
+            <div className="border-y border-prime-line px-6 py-20 text-center">
+              <p className="font-display text-display-md font-medium text-prime-ink">No saved stays yet</p>
+              <p className="mx-auto mt-4 max-w-md text-[15px] font-light text-prime-muted">
+                Explore the collection and tap the heart on the homes you love.
+              </p>
+              <Link to="/search" className="prime-btn mt-8">
+                Explore stays
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8 xl:grid-cols-4">
+              {items.map((u) => (
+                <ListingCard key={u.id} listing={u} />
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+      <Footer />
+    </div>
+  );
+}

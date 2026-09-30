@@ -1,12 +1,14 @@
 const { Router } = require('express');
 const { randomUUID } = require('crypto');
 const { findUnit, createBooking, listBookings, findBooking } = require('../lib/cmsStore');
+const { requireAdmin } = require('../middleware/adminAuth');
 
 const router = Router();
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.get(
   '/',
+  requireAdmin,
   wrap(async (_req, res) => {
     res.json({ items: await listBookings() });
   })

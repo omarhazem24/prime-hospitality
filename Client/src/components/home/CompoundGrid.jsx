@@ -2,98 +2,94 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import api from '../../api/client';
 import { useLocale } from '../../context/LocaleContext';
-import KeyLine from '../ui/KeyLine';
+import Img from '../ui/Img';
+import Reveal from '../ui/Reveal';
+import SectionIntro from '../ui/SectionIntro';
 import { cn } from '../../utils/cn';
 
+function DestinationTile({ destination, index, meta, lead }) {
+  return (
+    <Link
+      to={`/search?destination=${encodeURIComponent(destination.id)}`}
+      className={cn(
+        'group relative block w-[78vw] flex-none snap-start overflow-hidden bg-[#221f20] sm:w-[46vw] md:w-auto',
+        lead ? 'aspect-[3/4] md:col-span-2 md:row-span-2 md:aspect-auto' : 'aspect-[3/4] md:aspect-[4/5]'
+      )}
+    >
+      <Img
+        src={destination.image}
+        alt=""
+        sizes={lead ? '(min-width: 768px) 60vw, 80vw' : '(min-width: 768px) 30vw, 80vw'}
+        className="absolute inset-0 h-full w-full object-cover opacity-90 transition duration-[1600ms] ease-prime group-hover:scale-[1.05] group-hover:opacity-100"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+      <span className="absolute start-5 top-5 text-[11px] font-medium tracking-[0.24em] text-white/70 md:start-7 md:top-7">
+        {String(index + 1).padStart(2, '0')}
+      </span>
+      <div className="absolute inset-x-0 bottom-0 p-5 text-white md:p-7">
+        <h3 className={cn('font-display font-medium leading-none', lead ? 'text-[2.4rem] md:text-[3.6rem]' : 'text-[2rem] md:text-[2.3rem]')}>
+          {destination.name}
+        </h3>
+        {meta ? <p className="mt-3 text-[12px] font-light tracking-[0.06em] text-white/70">{meta}</p> : null}
+        <span className="mt-5 inline-flex items-center gap-3 text-[10.5px] font-medium uppercase tracking-[0.28em] text-white/90">
+          Discover
+          <span className="h-px w-6 bg-prime-gold transition-all duration-500 ease-prime group-hover:w-12" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/** Home: destination tiles → /search?destination=… */
 export default function CompoundGrid({ limit, hideIntro = false, homeOnly = false }) {
   const { t } = useLocale();
   const [items, setItems] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
-    api.getCompounds(homeOnly ? { home: true } : undefined).then((res) => {
-      if (!cancelled) {
+    api
+      .getDestinations(homeOnly ? { home: true } : undefined)
+      .then((res) => {
+        if (cancelled) return;
         const list = res.items || [];
         setItems(limit ? list.slice(0, limit) : list);
-      }
-    });
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [limit, homeOnly]);
 
-  return (
-    <section className="relative overflow-hidden bg-prime-night py-20 text-white md:py-28">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            'radial-gradient(ellipse 55% 45% at 90% 0%, rgba(172,148,107,0.18), transparent 60%)',
-        }}
-      />
-      <div className="relative mx-auto max-w-prime px-5 sm:px-8">
-        {!hideIntro ? (
-          <div className="mb-14 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-xl">
-              <p className="prime-eyebrow mb-3 text-prime-gold">{t('home.destinations')}</p>
-              <h2 className="font-display text-display-lg text-white">{t('home.destinationsBody')}</h2>
-              <KeyLine tone="light" className="mt-7 max-w-[5.5rem]" />
-            </div>
-            <Link
-              to="/compounds"
-              className="group inline-flex shrink-0 items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/65 transition hover:text-prime-gold"
-            >
-              {t('home.exploreCompounds')}
-              <span className="inline-block h-px w-8 bg-prime-gold transition-all group-hover:w-12" />
-            </Link>
-          </div>
-        ) : null}
+  const destinationMeta = (d) =>
+    [
+      t('home.propertiesCount', { count: d.projectCount ?? d.projects?.length ?? 0 }),
+      d.unitTypeCount ? t('home.unitTypesCount', { count: d.unitTypeCount }) : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
-        <div className="grid auto-rows-[minmax(240px,1fr)] gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3.5">
-          {items.map((c, i) => {
-            const isLead = i === 0;
-            return (
-              <Link
-                key={c.id}
-                to={`/search?compound=${c.id}`}
-                className={cn(
-                  'group relative overflow-hidden',
-                  isLead && 'min-h-[300px] sm:col-span-2 sm:row-span-2 lg:min-h-0'
-                )}
-              >
-                <img
-                  src={c.image}
-                  alt={c.name}
-                  className="h-full w-full object-cover transition duration-[1200ms] ease-out group-hover:scale-[1.06]"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-prime-night via-prime-night/30 to-transparent opacity-90 transition duration-500 group-hover:opacity-95" />
-                <div
-                  className={cn(
-                    'absolute inset-x-0 bottom-0 p-5 text-white sm:p-6',
-                    isLead && 'sm:p-9'
-                  )}
-                >
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-prime-gold">
-                    {c.region}
-                  </p>
-                  <h3
-                    className={cn(
-                      'mt-2.5 font-display font-bold leading-none tracking-[-0.025em]',
-                      isLead ? 'text-[2.1rem] sm:text-[3rem]' : 'text-[1.5rem]'
-                    )}
-                  >
-                    {c.name}
-                  </h3>
-                  <p className="mt-2.5 text-xs font-medium tracking-wide text-white/50">
-                    {c.unitCount} stays
-                  </p>
-                  <span className="mt-5 inline-block h-px w-0 bg-prime-gold transition-all duration-500 group-hover:w-14" />
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+  return (
+    <section className="prime-section overflow-hidden">
+      <div className="prime-container">
+        {!hideIntro ? (
+          <SectionIntro
+            align="split"
+            eyebrow={t('home.destinations')}
+            title={t('home.destinationsBody')}
+            link={{ to: '/compounds', label: t('home.exploreCompounds') }}
+          />
+        ) : null}
+        <Reveal className="prime-scroll-x -mx-5 gap-3 px-5 sm:-mx-8 sm:px-8 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:gap-5">
+          {items.map((d, i) => (
+            <DestinationTile
+              key={d.id}
+              destination={d}
+              index={i}
+              meta={destinationMeta(d)}
+              lead={i === 0 && items.length > 2}
+            />
+          ))}
+        </Reveal>
       </div>
     </section>
   );

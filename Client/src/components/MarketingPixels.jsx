@@ -33,6 +33,24 @@ export default function MarketingPixels() {
         if (cancelled) return;
         const metaId = String(pixels.metaPixelId || pixels.facebookPixelId || '').trim();
         const gtmId = String(pixels.gtmId || '').trim();
+        const gtagIds = [pixels.ga4Id, pixels.googleAdsId]
+          .map((id) => String(id || '').trim())
+          .filter((id) => /^(G|AW)-[A-Z0-9-]+$/i.test(id));
+
+        if (gtagIds.length) {
+          injectScript(
+            'prime-gtag',
+            `
+            <script async src="https://www.googletagmanager.com/gtag/js?id=${gtagIds[0]}"></script>
+            <script>
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              ${gtagIds.map((id) => `gtag('config', '${id}');`).join('\n')}
+            </script>
+            `
+          );
+        }
 
         if (metaId && /^\d+$/.test(metaId)) {
           injectScript(

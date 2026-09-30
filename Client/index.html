@@ -4,26 +4,29 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/brand/Hospitality.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#221F20" />
+    <meta name="theme-color" content="#F7F4EF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#221F20" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="Prime Hospitality — curated stays across Egypt's finest compounds and coastal escapes."
+      content="Prime Hospitality — Prime Inn, Residence and Select stays across Egypt's finest destinations. Book direct."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Prime Hospitality" />
+    <meta property="og:title" content="Prime Hospitality — Prime stays for Prime customers" />
+    <meta
+      property="og:description"
+      content="Prime Inn, Residence and Select stays across Egypt's finest destinations. Book direct."
     />
+    <meta property="og:image" content="/brand/Hospitality.png" />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <link rel="dns-prefetch" href="https://res.cloudinary.com" />
     <title>Prime Hospitality</title>
     <script>
       (function () {
         try {
           var t = localStorage.getItem('prime_theme');
-          if (t !== 'dark' && t !== 'light') {
-            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
+          if (t !== 'dark' && t !== 'light') t = 'light';
           if (t === 'dark') document.documentElement.classList.add('dark');
           document.documentElement.style.colorScheme = t;
         } catch (e) {}
@@ -32,6 +35,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>Prime Hospitality needs JavaScript to show available stays.</noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

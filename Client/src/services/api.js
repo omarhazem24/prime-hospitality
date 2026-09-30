@@ -5,6 +5,8 @@
 import api from '../api/client';
 
 const BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const GEO_KEY = 'prime.geo';
+let bookingConfigPromise = null;
 
 async function request(path, { method = 'GET', params, body } = {}) {
   const url = new URL(path, BASE || window.location.origin);
@@ -44,6 +46,24 @@ export const kwentraApi = {
 
   quote(payload) {
     return request('/api/kwentra/quote', { method: 'POST', body: payload });
+  },
+
+  /** PMS field contract, rate plans and allowed check-in / check-out times */
+  getBookingConfig() {
+    bookingConfigPromise ||= request('/api/booking/config').catch((err) => {
+      bookingConfigPromise = null;
+      throw err;
+    });
+    return bookingConfigPromise;
+  },
+
+  /** Booker country from IP — pre-fills nationality + reservation country */
+  async getGeo() {
+    const cached = sessionStorage.getItem(GEO_KEY);
+    if (cached) return JSON.parse(cached);
+    const geo = await request('/api/booking/geo');
+    if (geo?.country) sessionStorage.setItem(GEO_KEY, JSON.stringify(geo));
+    return geo;
   },
 
   /** Create on-site booking hold + embedded payment session (zero redirect) */

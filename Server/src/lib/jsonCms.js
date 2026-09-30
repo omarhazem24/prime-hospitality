@@ -1,13 +1,25 @@
 /**
  * Local JSON CMS (dev fallback when Supabase env vars are missing).
+ * Inventory layering: destinations → compounds (properties) → units (unit types).
  */
 const fs = require('fs');
 const path = require('path');
 const { randomUUID } = require('crypto');
-const { compounds: seedCompounds, listings: seedListings, propertyTypes, partners, trustPoints, faqs } =
-  require('../data/mock');
+const {
+  destinations: seedDestinations,
+  compounds: seedCompounds,
+  listings: seedListings,
+  propertyTypes,
+  partners,
+  trustPoints,
+  faqs,
+} = require('../data/mock');
+const { brandFromName } = require('../data/inventory');
+const { COMPOUND_FIELDS, UNIT_FIELDS, applyFields, defaults, syncCoords } = require('./fields');
+const { normalizeSite, mergeSite, sanitizeContentLists } = require('./siteContent');
 
 const STORE_PATH = path.join(__dirname, '../../data/cms-store.json');
+const STORE_VERSION = 2;
 
 const DEFAULT_SLIDESHOW = [
   {
@@ -36,29 +48,28 @@ const DEFAULT_SLIDESHOW = [
   },
 ];
 
-const bookingsMem = [];
-const guestsMem = new Map();
-
-function buildSeed() {
-  const compounds = seedCompounds.map((c, i) => ({
-    ...c,
-    sortOrder: i,
-    showOnHome: true,
-    published: true,
-  }));
+function buildInventorySeed() {
+  const destinations = seedDestinations.map((d) => ({ ...d }));
+  const compounds = seedCompounds.map((c) => ({ ...c }));
   const units = seedListings.map((l, i) => ({
     ...l,
     published: l.available !== false,
     homeOrder: l.featured ? i : 1000 + i,
     searchOrder: i,
     driveFolderUrl: '',
+    kwentraRoomTypeId: l.kwentraRoomTypeId || '',
   }));
+  return { destinations, compounds, units };
+}
+
+function buildSeed() {
   return {
-    version: 1,
+    version: STORE_VERSION,
     updatedAt: new Date().toISOString(),
     slideshow: DEFAULT_SLIDESHOW,
-    compounds,
-    units,
+    ...buildInventorySeed(),
+    bookings: [],
+    counters: { voucher: 0 },
     settings: {
       metaPixelId: '',
       facebookPixelId: '',
@@ -69,17 +80,40 @@ function buildSeed() {
   };
 }
 
+/** v1 stores held the old sample compounds/units — swap in the PHMG inventory, keep site settings. */
+function migrate(store) {
+  if ((store.version || 1) >= STORE_VERSION) return store;
+  console.warn('[prime] Migrating cms-store.json to v2 (Destination > Property > Unit Type inventory)');
+  return {
+    ...store,
+    version: STORE_VERSION,
+    ...buildInventorySeed(),
+    bookings: store.bookings || [],
+    counters: store.counters || { voucher: 0 },
+    content: { ...(store.content || {}), propertyTypes, trustPoints },
+  };
+}
+
 function ensureStore() {
   const dir = path.dirname(STORE_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   if (!fs.existsSync(STORE_PATH)) {
     fs.writeFileSync(STORE_PATH, JSON.stringify(buildSeed(), null, 2), 'utf8');
+    return;
+  }
+  const current = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+  if ((current.version || 1) < STORE_VERSION) {
+    fs.writeFileSync(STORE_PATH, JSON.stringify(migrate(current), null, 2), 'utf8');
   }
 }
 
 function readStore() {
   ensureStore();
-  return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+  const store = JSON.parse(fs.readFileSync(STORE_PATH, 'utf8'));
+  store.destinations = store.destinations || [];
+  store.bookings = store.bookings || [];
+  store.counters = store.counters || { voucher: 0 };
+  return store;
 }
 
 function writeStore(data) {
@@ -103,6 +137,7 @@ function slugify(text) {
   return String(text || '')
     .toLowerCase()
     .trim()
+    .replace(/&/g, 'and')
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -122,15 +157,48 @@ function applyOrder(items, orderedIds, orderKey) {
   return items;
 }
 
+function conflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  return err;
+}
+
+/** Copy destination onto a property (denormalized for fast filtering). */
+function linkCompound(compound, destinations) {
+  const dest = destinations.find((d) => d.id === compound.destinationId);
+  compound.region = dest?.name || compound.region || '';
+  compound.brand = compound.brand || brandFromName(compound.name);
+}
+
+/** Copy property + destination onto a unit type. */
+function linkUnit(unit, compounds) {
+  const compound = compounds.find((c) => c.id === unit.compoundId);
+  if (!compound) return;
+  unit.compound = compound.name;
+  unit.brand = compound.brand || '';
+  unit.destinationId = compound.destinationId || '';
+  unit.destination = compound.region || '';
+  unit.region = compound.region || '';
+  if (!unit.city) unit.city = compound.city || '';
+}
+
+function refreshCounts(store) {
+  for (const c of store.compounds) {
+    c.unitCount = store.units.filter((u) => u.compoundId === c.id && u.published !== false).length;
+  }
+}
+
 async function getDashboard() {
   const store = readStore();
   return {
     counts: {
+      destinations: store.destinations.length,
+      compounds: store.compounds.length,
       units: store.units.length,
       publishedUnits: store.units.filter((u) => u.published !== false).length,
       featuredUnits: store.units.filter((u) => u.featured).length,
-      compounds: store.compounds.length,
       slides: store.slideshow.length,
+      bookings: store.bookings.length,
     },
     updatedAt: store.updatedAt,
   };
@@ -150,6 +218,13 @@ async function getPublicCompounds({ homeOnly = false } = {}) {
   return sortBy(list, 'sortOrder');
 }
 
+async function getPublicDestinations({ homeOnly = false } = {}) {
+  const { destinations } = readStore();
+  let list = destinations.filter((d) => d.published !== false);
+  if (homeOnly) list = list.filter((d) => d.showOnHome !== false);
+  return sortBy(list, 'sortOrder');
+}
+
 async function getSlideshow() {
   const { slideshow } = readStore();
   return sortBy(
@@ -166,6 +241,26 @@ async function getContent() {
   return readStore().content || buildSeed().content;
 }
 
+async function saveContent(body) {
+  const store = updateStore((s) => {
+    s.content = sanitizeContentLists(body, s.content || buildSeed().content);
+    return s;
+  });
+  return store.content;
+}
+
+async function getSite() {
+  return normalizeSite(readStore().site);
+}
+
+async function saveSite(patch) {
+  const store = updateStore((s) => {
+    s.site = mergeSite(s.site, patch);
+    return s;
+  });
+  return store.site;
+}
+
 async function findUnit(idOrSlug) {
   const { units } = readStore();
   return units.find((u) => u.id === idOrSlug || u.slug === idOrSlug) || null;
@@ -174,6 +269,15 @@ async function findUnit(idOrSlug) {
 async function findCompound(id) {
   const { compounds } = readStore();
   return compounds.find((c) => c.id === id) || null;
+}
+
+async function findDestination(id) {
+  const { destinations } = readStore();
+  return destinations.find((d) => d.id === id) || null;
+}
+
+async function listDestinations() {
+  return sortBy(readStore().destinations || [], 'sortOrder');
 }
 
 async function listCompounds() {
@@ -233,27 +337,93 @@ async function reorderSlides(ids) {
   return sortBy(store.slideshow, 'sortOrder');
 }
 
-async function createCompound(body) {
+/* ——— Destinations ——— */
+async function createDestination(body) {
   const id = body.id || slugify(body.name);
-  if (await findCompound(id)) {
-    const err = new Error('Compound id already exists');
-    err.status = 409;
-    throw err;
-  }
+  if (await findDestination(id)) throw conflict('Destination id already exists');
   const store = updateStore((s) => {
-    s.compounds.push({
+    s.destinations.push({
       id,
       name: body.name,
-      region: body.region || '',
+      description: body.description || '',
+      image: body.image || '',
+      sortOrder: s.destinations.length,
+      showOnHome: body.showOnHome !== false,
+      published: body.published !== false,
+      kwentraDestinationId: body.kwentraDestinationId || '',
+    });
+    return s;
+  });
+  return store.destinations.find((d) => d.id === id);
+}
+
+async function updateDestination(id, body) {
+  let item = null;
+  updateStore((s) => {
+    const found = s.destinations.find((d) => d.id === id);
+    if (!found) return s;
+    const fields = ['name', 'description', 'image', 'sortOrder', 'showOnHome', 'published', 'kwentraDestinationId'];
+    for (const key of fields) {
+      if (body?.[key] !== undefined) found[key] = body[key];
+    }
+    if (body?.name !== undefined) {
+      s.compounds.filter((c) => c.destinationId === id).forEach((c) => linkCompound(c, s.destinations));
+      s.units.forEach((u) => linkUnit(u, s.compounds));
+    }
+    item = found;
+    return s;
+  });
+  return item;
+}
+
+async function deleteDestination(id) {
+  const { compounds } = readStore();
+  if (compounds.some((c) => c.destinationId === id)) {
+    throw conflict('Move or delete the properties in this destination first');
+  }
+  const store = updateStore((s) => {
+    s.destinations = s.destinations.filter((d) => d.id !== id);
+    s.destinations.forEach((d, i) => {
+      d.sortOrder = i;
+    });
+    return s;
+  });
+  return sortBy(store.destinations, 'sortOrder');
+}
+
+async function reorderDestinations(ids) {
+  const store = updateStore((s) => {
+    s.destinations = applyOrder(s.destinations, ids, 'sortOrder');
+    return s;
+  });
+  return sortBy(store.destinations, 'sortOrder');
+}
+
+/* ——— Properties (compounds) ——— */
+async function createCompound(body) {
+  const id = body.id || slugify(body.name);
+  if (await findCompound(id)) throw conflict('Property id already exists');
+  const store = updateStore((s) => {
+    const compound = {
+      id,
+      name: body.name,
+      brand: body.brand || brandFromName(body.name),
       destinationId: body.destinationId || '',
-      unitCount: Number(body.unitCount) || 0,
+      region: body.region || '',
+      city: body.city || '',
+      unitCount: 0,
       image: body.image || '',
       sortOrder: s.compounds.length,
       showOnHome: body.showOnHome !== false,
       published: body.published !== false,
       kwentraProjectId: body.kwentraProjectId || '',
       kwentraDestinationId: body.kwentraDestinationId || '',
-    });
+      ...defaults(COMPOUND_FIELDS),
+    };
+    applyFields(compound, body, COMPOUND_FIELDS);
+    syncCoords(compound, body);
+    linkCompound(compound, s.destinations);
+    s.compounds.push(compound);
     return s;
   });
   return store.compounds.find((c) => c.id === id);
@@ -266,10 +436,10 @@ async function updateCompound(id, body) {
     if (!found) return s;
     const fields = [
       'name',
-      'region',
+      'brand',
       'destinationId',
+      'city',
       'image',
-      'unitCount',
       'showOnHome',
       'published',
       'sortOrder',
@@ -279,7 +449,10 @@ async function updateCompound(id, body) {
     for (const key of fields) {
       if (body?.[key] !== undefined) found[key] = body[key];
     }
-    if (body?.unitCount !== undefined) found.unitCount = Number(body.unitCount) || 0;
+    applyFields(found, body, COMPOUND_FIELDS);
+    syncCoords(found, body);
+    linkCompound(found, s.destinations);
+    s.units.filter((u) => u.compoundId === id).forEach((u) => linkUnit(u, s.compounds));
     item = found;
     return s;
   });
@@ -287,6 +460,10 @@ async function updateCompound(id, body) {
 }
 
 async function deleteCompound(id) {
+  const { units } = readStore();
+  if (units.some((u) => u.compoundId === id)) {
+    throw conflict('Delete or move the unit types in this property first');
+  }
   const store = updateStore((s) => {
     s.compounds = (s.compounds || []).filter((c) => c.id !== id);
     s.compounds.forEach((c, i) => {
@@ -305,26 +482,26 @@ async function reorderCompounds(ids) {
   return sortBy(store.compounds, 'sortOrder');
 }
 
+/* ——— Unit types (units) ——— */
 async function createUnit(body) {
   const slug = body.slug || slugify(body.title);
-  if (await findUnit(slug)) {
-    const err = new Error('Slug already exists');
-    err.status = 409;
-    throw err;
-  }
+  if (await findUnit(slug)) throw conflict('Slug already exists');
   let created = null;
   updateStore((s) => {
-    const compound = (s.compounds || []).find((c) => c.id === body.compoundId);
     const unit = {
       id: newId('unit'),
       slug,
       title: body.title,
+      unitType: body.unitType || '',
       compoundId: body.compoundId || '',
-      compound: body.compound || compound?.name || '',
-      region: body.region || compound?.region || '',
+      compound: '',
+      brand: '',
+      destinationId: '',
+      destination: '',
+      region: '',
       city: body.city || '',
-      propertyType: body.propertyType || 'Apartment',
-      bedrooms: Number(body.bedrooms) || 1,
+      propertyType: body.propertyType || (body.unitType === 'Studio' ? 'Studio' : 'Apartment'),
+      bedrooms: Number(body.bedrooms) || 0,
       bathrooms: Number(body.bathrooms) || 1,
       areaSqm: Number(body.areaSqm) || 0,
       maxGuests: Number(body.maxGuests) || 2,
@@ -344,8 +521,12 @@ async function createUnit(body) {
       averageRating: body.averageRating || 0,
       reviewCount: body.reviewCount || 0,
       reviews: Array.isArray(body.reviews) ? body.reviews : [],
+      ...defaults(UNIT_FIELDS),
     };
+    applyFields(unit, body, UNIT_FIELDS);
+    linkUnit(unit, s.compounds);
     s.units.push(unit);
+    refreshCounts(s);
     created = unit;
     return s;
   });
@@ -360,9 +541,8 @@ async function updateUnit(idOrSlug, body) {
     const scalar = [
       'title',
       'slug',
+      'unitType',
       'compoundId',
-      'compound',
-      'region',
       'city',
       'propertyType',
       'currency',
@@ -384,11 +564,9 @@ async function updateUnit(idOrSlug, body) {
     if (Array.isArray(body.amenities)) found.amenities = body.amenities;
     if (Array.isArray(body.facilities)) found.facilities = body.facilities;
     if (Array.isArray(body.images)) found.images = body.images;
-    if (body.compoundId) {
-      const compound = (s.compounds || []).find((c) => c.id === body.compoundId);
-      if (compound && !body.compound) found.compound = compound.name;
-      if (compound && !body.region) found.region = compound.region;
-    }
+    applyFields(found, body, UNIT_FIELDS);
+    linkUnit(found, s.compounds);
+    refreshCounts(s);
     item = found;
     return s;
   });
@@ -401,6 +579,7 @@ async function deleteUnit(idOrSlug) {
     s.units.forEach((u, i) => {
       u.searchOrder = i;
     });
+    refreshCounts(s);
     return s;
   });
   return sortBy(store.units, 'searchOrder');
@@ -439,42 +618,43 @@ async function saveSettings(body) {
   return store.settings;
 }
 
+/* ——— Bookings ——— */
+async function nextVoucherSerial() {
+  let serial = 0;
+  updateStore((s) => {
+    s.counters.voucher = (Number(s.counters.voucher) || 0) + 1;
+    serial = s.counters.voucher;
+    return s;
+  });
+  return serial;
+}
+
 async function createBooking(booking) {
-  bookingsMem.unshift(booking);
+  updateStore((s) => {
+    s.bookings.unshift(booking);
+    return s;
+  });
   return booking;
 }
 
+async function updateBooking(id, patch) {
+  let item = null;
+  updateStore((s) => {
+    const found = s.bookings.find((b) => b.id === id);
+    if (!found) return s;
+    Object.assign(found, patch);
+    item = found;
+    return s;
+  });
+  return item;
+}
+
 async function listBookings() {
-  return bookingsMem;
+  return readStore().bookings;
 }
 
 async function findBooking(id) {
-  return bookingsMem.find((b) => b.id === id) || null;
-}
-
-async function findGuestByEmail(email) {
-  const key = String(email || '').toLowerCase();
-  const row = guestsMem.get(key);
-  return row || null;
-}
-
-async function createGuest({ name, email, password }) {
-  const key = String(email).toLowerCase();
-  if (guestsMem.has(key)) {
-    const err = new Error('Account already exists');
-    err.status = 409;
-    throw err;
-  }
-  const user = { id: randomUUID(), name: name || key.split('@')[0], email: key, password };
-  guestsMem.set(key, user);
-  return { id: user.id, name: user.name, email: user.email };
-}
-
-async function findGuestById(id) {
-  for (const u of guestsMem.values()) {
-    if (u.id === id) return u;
-  }
-  return null;
+  return readStore().bookings.find((b) => b.id === id || b.voucherNumber === id) || null;
 }
 
 module.exports = {
@@ -486,11 +666,17 @@ module.exports = {
   getDashboard,
   getPublicUnits,
   getPublicCompounds,
+  getPublicDestinations,
   getSlideshow,
   getSettings,
   getContent,
+  saveContent,
+  getSite,
+  saveSite,
   findUnit,
   findCompound,
+  findDestination,
+  listDestinations,
   listCompounds,
   listUnits,
   listSlides,
@@ -498,6 +684,10 @@ module.exports = {
   updateSlide,
   deleteSlide,
   reorderSlides,
+  createDestination,
+  updateDestination,
+  deleteDestination,
+  reorderDestinations,
   createCompound,
   updateCompound,
   deleteCompound,
@@ -508,10 +698,9 @@ module.exports = {
   reorderHomeUnits,
   reorderSearchUnits,
   saveSettings,
+  nextVoucherSerial,
   createBooking,
+  updateBooking,
   listBookings,
   findBooking,
-  findGuestByEmail,
-  createGuest,
-  findGuestById,
 };

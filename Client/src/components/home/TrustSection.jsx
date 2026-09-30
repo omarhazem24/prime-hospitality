@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/client';
 import { useLocale } from '../../context/LocaleContext';
-import KeyLine from '../ui/KeyLine';
+import Img from '../ui/Img';
+import Reveal from '../ui/Reveal';
+
+const IMAGE = 'https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=1400&q=72';
 
 export default function TrustSection() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const ar = locale === 'ar';
   const [items, setItems] = useState([]);
 
   useEffect(() => {
@@ -21,38 +25,43 @@ export default function TrustSection() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-prime-mist py-20 md:py-28">
-      <div className="mx-auto max-w-prime px-5 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-          <div className="lg:sticky lg:top-28 lg:self-start">
-            <p className="prime-eyebrow mb-3">{t('home.why')}</p>
-            <h2 className="font-display text-display-lg text-prime-ink">{t('home.trustTitle')}</h2>
-            <KeyLine className="mt-7 max-w-[5.5rem]" />
-            <p className="mt-6 max-w-sm text-sm font-medium leading-relaxed text-prime-muted">
-              Quiet luxury. Considered design. Hospitality that feels like a private key.
-            </p>
+    <section className="prime-section">
+      <div className="prime-container grid gap-14 lg:grid-cols-2 lg:gap-24">
+        <Reveal className="lg:sticky lg:top-[calc(var(--prime-header-h)+2rem)] lg:self-start">
+          <div className="relative aspect-[4/5] overflow-hidden bg-prime-mist">
+            <Img src={IMAGE} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="h-full w-full object-cover" />
           </div>
+        </Reveal>
 
-          <div className="space-y-0">
+        <div className="lg:py-10">
+          <Reveal>
+            <p className="prime-eyebrow mb-5 text-prime-gold-deep">{t('home.why')}</p>
+            <h2 className="font-display text-display-lg font-medium text-prime-ink text-balance">{t('home.trustTitle')}</h2>
+            <p className="prime-lede mt-6 max-w-md">{t('home.trustBody')}</p>
+          </Reveal>
+
+          <ol className="mt-14">
             {items.map((p, i) => (
-              <div
+              <Reveal
+                as="li"
                 key={p.title}
-                className="group grid gap-4 border-t border-prime-line py-8 sm:grid-cols-[4.5rem_1fr] sm:gap-8"
+                delay={i * 80}
+                className="grid grid-cols-[3.5rem_1fr] gap-4 border-t border-prime-line py-8 last:border-b sm:grid-cols-[5rem_1fr]"
               >
-                <span className="font-display text-3xl font-bold tracking-[-0.04em] text-prime-gold/45 transition duration-300 group-hover:text-prime-gold">
+                <span className="font-display text-[2rem] font-medium leading-none text-prime-gold">
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <div>
-                  <h3 className="font-display text-[1.4rem] font-bold leading-snug tracking-[-0.02em] text-prime-ink">
-                    {p.title}
+                  <h3 className="font-display text-[1.6rem] font-medium leading-snug text-prime-ink">
+                    {(ar && p.titleAr) || p.title}
                   </h3>
-                  <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-prime-muted">
-                    {p.body}
+                  <p className="mt-3 max-w-md text-[15px] font-light leading-[1.75] text-prime-muted">
+                    {(ar && p.bodyAr) || p.body}
                   </p>
                 </div>
-              </div>
+              </Reveal>
             ))}
-          </div>
+          </ol>
         </div>
       </div>
     </section>

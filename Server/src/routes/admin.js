@@ -6,6 +6,12 @@ const {
   updateSlide,
   deleteSlide,
   reorderSlides,
+  listDestinations,
+  createDestination,
+  updateDestination,
+  deleteDestination,
+  reorderDestinations,
+  listBookings,
   listCompounds,
   createCompound,
   updateCompound,
@@ -19,6 +25,10 @@ const {
   reorderSearchUnits,
   getSettings,
   saveSettings,
+  getContent,
+  saveContent,
+  getSite,
+  saveSite,
   usingSupabase,
 } = require('../lib/cmsStore');
 const { getAdminCredentials, signAdminToken, requireAdmin } = require('../middleware/adminAuth');
@@ -38,6 +48,7 @@ const router = Router();
 const FOLDER_MAP = {
   slideshow: FOLDER_SLIDESHOW,
   compounds: FOLDER_COMPOUNDS,
+  destinations: FOLDER_COMPOUNDS,
   site: FOLDER_SITE,
 };
 
@@ -179,7 +190,69 @@ router.delete(
   })
 );
 
-/* ——— Compounds (Cloudinary cover images) ——— */
+/* ——— Destinations (top of the inventory layering) ——— */
+router.get(
+  '/destinations',
+  requireAdmin,
+  wrap(async (_req, res) => {
+    res.json({ items: await listDestinations() });
+  })
+);
+
+router.post(
+  '/destinations',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const body = req.body || {};
+    if (!body.name) return res.status(400).json({ error: 'name is required' });
+    const item = await createDestination(body);
+    res.status(201).json({ item });
+  })
+);
+
+router.patch(
+  '/destinations/reorder',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const ids = req.body?.ids;
+    if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids array required' });
+    res.json({ items: await reorderDestinations(ids) });
+  })
+);
+
+router.patch(
+  '/destinations/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const item = await updateDestination(req.params.id, req.body || {});
+    if (!item) return res.status(404).json({ error: 'Destination not found' });
+    res.json({ item });
+  })
+);
+
+router.delete(
+  '/destinations/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    res.json({ items: await deleteDestination(req.params.id) });
+  })
+);
+
+/* ——— Bookings (website booking engine → PMS fields) ——— */
+router.get(
+  '/bookings',
+  requireAdmin,
+  wrap(async (_req, res) => {
+    const { toPmsRows, PMS_FIELDS } = require('../lib/pms');
+    const items = await listBookings();
+    res.json({
+      fields: PMS_FIELDS,
+      items: items.map((b) => ({ ...b, pms: toPmsRows(b) })),
+    });
+  })
+);
+
+/* ——— Properties / compounds (Cloudinary cover images) ——— */
 router.get(
   '/compounds',
   requireAdmin,
@@ -244,17 +317,6 @@ router.get(
   })
 );
 
-router.patch(
-  '/units/:id',
-  requireAdmin,
-  wrap(async (req, res) => {
-    const sync = require('../services/kwentraSync');
-    const result = await sync.saveUnitWithSync(req.params.id, req.body || {});
-    if (!result.unit) return res.status(404).json({ error: 'Unit not found' });
-    res.json({ item: result.unit, kwentra: result.kwentra });
-  })
-);
-
 router.post(
   '/units',
   requireAdmin,
@@ -288,11 +350,102 @@ router.patch(
   })
 );
 
+/** Website-only flags in bulk (visibility / homepage) — nothing that belongs to the PMS */
+const BULK_UNIT_FIELDS = ['published', 'featured'];
+
+router.patch(
+  '/units/bulk',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).slice(0, 500) : [];
+    const patch = Object.fromEntries(
+      BULK_UNIT_FIELDS.filter((k) => typeof req.body?.patch?.[k] === 'boolean').map((k) => [k, req.body.patch[k]])
+    );
+    if (!ids.length || !Object.keys(patch).length) {
+      return res.status(400).json({ error: 'ids and a published/featured patch are required' });
+    }
+    let updated = 0;
+    for (const id of ids) {
+      if (await updateUnit(id, patch)) updated += 1;
+    }
+    res.json({ updated });
+  })
+);
+
+router.patch(
+  '/units/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const sync = require('../services/kwentraSync');
+    const result = await sync.saveUnitWithSync(req.params.id, req.body || {});
+    if (!result.unit) return res.status(404).json({ error: 'Unit not found' });
+    res.json({ item: result.unit, kwentra: result.kwentra });
+  })
+);
+
 router.delete(
   '/units/:id',
   requireAdmin,
   wrap(async (req, res) => {
     res.json({ items: await deleteUnit(req.params.id) });
+  })
+);
+
+/* ——— Kwentra sync (PMS → website store) ——— */
+router.get(
+  '/kwentra/status',
+  requireAdmin,
+  (_req, res) => {
+    res.json(require('../services/kwentraSync').syncStatus());
+  }
+);
+
+router.post(
+  '/kwentra/sync',
+  requireAdmin,
+  wrap(async (_req, res) => {
+    const report = await require('../services/kwentraSync').syncFromKwentra();
+    res.status(report.reason === 'not_configured' ? 503 : 200).json(report);
+  })
+);
+
+/* ——— Inventory spreadsheet import (property fact sheets) ——— */
+const sheetUpload = require('multer')({
+  storage: require('multer').memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /\.xlsx$/i.test(file.originalname || '');
+    cb(ok ? null : Object.assign(new Error('Upload an .xlsx file'), { status: 400 }), ok);
+  },
+});
+
+router.post(
+  '/import/inventory',
+  requireAdmin,
+  sheetUpload.single('file'),
+  wrap(async (req, res) => {
+    const buf = req.file?.buffer;
+    // .xlsx files are zip archives ("PK")
+    if (!buf || buf[0] !== 0x50 || buf[1] !== 0x4b) {
+      return res.status(400).json({ error: 'Upload the inventory workbook as an .xlsx file' });
+    }
+    const { parseInventoryWorkbook } = require('../lib/inventorySheet');
+    const { importInventory } = require('../services/inventoryImport');
+    let parsed;
+    try {
+      parsed = await parseInventoryWorkbook(buf);
+    } catch {
+      return res.status(400).json({ error: 'Could not read that workbook — save it as .xlsx and try again' });
+    }
+    if (!parsed.properties.length) {
+      return res.status(400).json({ error: 'No property rows found in the workbook', warnings: parsed.warnings });
+    }
+    const apply = req.query.apply === '1' || req.query.apply === 'true';
+    const report = await importInventory(parsed, {
+      dryRun: !apply,
+      destinationId: String(req.query.destinationId || req.body?.destinationId || ''),
+    });
+    res.json({ ...report, parsed: parsed.properties });
   })
 );
 
@@ -309,6 +462,47 @@ router.put(
   requireAdmin,
   wrap(async (req, res) => {
     res.json({ settings: await saveSettings(req.body || {}) });
+  })
+);
+
+/* ——— Website content (pages, homepage, business info, announcement, SEO) ——— */
+router.get(
+  '/site',
+  requireAdmin,
+  wrap(async (_req, res) => {
+    res.json({ site: await getSite() });
+  })
+);
+
+router.put(
+  '/site',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const body = req.body || {};
+    const { SECTIONS } = require('../lib/siteContent');
+    if (!SECTIONS.some((k) => body[k] !== undefined)) {
+      return res.status(400).json({ error: `Send at least one of: ${SECTIONS.join(', ')}` });
+    }
+    res.json({ site: await saveSite(body) });
+  })
+);
+
+/* ——— Guest page lists: FAQs, trust points, partners ——— */
+router.get(
+  '/content',
+  requireAdmin,
+  wrap(async (_req, res) => {
+    const { faqs = [], trustPoints = [], partners = [] } = await getContent();
+    res.json({ content: { faqs, trustPoints, partners } });
+  })
+);
+
+router.put(
+  '/content',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const { faqs = [], trustPoints = [], partners = [] } = await saveContent(req.body || {});
+    res.json({ content: { faqs, trustPoints, partners } });
   })
 );
 

@@ -4,3 +4,4 @@ node_modules
 .DS_Store
 data/cms-store.json
 data/cms-store.json.tmp
+data/cms-store.backup*.json

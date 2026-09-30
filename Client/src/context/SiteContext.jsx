@@ -1,0 +1,98 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import api from '../api/client';
+import { brand } from '../theme/brand';
+
+export const HOME_SECTIONS = ['intro', 'properties', 'brands', 'featured', 'trust', 'partners', 'partnerCta'];
+
+export const DEFAULT_SITE = {
+  business: {},
+  announcement: { enabled: false, text: {}, linkLabel: {}, href: '', startsAt: '', endsAt: '', tone: 'night' },
+  home: { sections: HOME_SECTIONS.map((id) => ({ id, enabled: true })) },
+  pages: {
+    about: {},
+    careers: {
+      heroImage: '',
+      roles: [
+        { title: 'Guest Experience Associate', location: 'New Cairo', type: 'Full-time' },
+        { title: 'Property Operations Lead', location: 'North Coast (seasonal)', type: 'Full-time' },
+        { title: 'Interior Stylist (Freelance)', location: 'Remote / Cairo', type: 'Contract' },
+      ],
+    },
+    owners: {},
+    legal: {},
+  },
+  copy: { en: {}, ar: {} },
+  seo: { titleSuffix: '', defaultDescription: '', ogImage: '', pages: {} },
+  tracking: {},
+};
+
+const BRAND_DEFAULTS = structuredClone(brand);
+
+/** Business details from the admin replace the built-in brand values used across the site. */
+function applyBusiness(business = {}) {
+  const pick = (value, fallback) => (value ? value : fallback);
+  Object.assign(brand, {
+    name: pick(business.name, BRAND_DEFAULTS.name),
+    tagline: pick(business.tagline, BRAND_DEFAULTS.tagline),
+    email: pick(business.email, BRAND_DEFAULTS.email),
+    whatsapp: pick(business.whatsapp, BRAND_DEFAULTS.whatsapp),
+    phone: pick(business.phone || business.whatsapp, BRAND_DEFAULTS.whatsapp),
+    phoneDisplay: pick(business.phoneDisplay, BRAND_DEFAULTS.phoneDisplay),
+    address: pick(business.address, BRAND_DEFAULTS.address),
+    social: {
+      instagram: pick(business.instagram, BRAND_DEFAULTS.social.instagram),
+      facebook: pick(business.facebook, BRAND_DEFAULTS.social.facebook),
+      tiktok: business.tiktok || '',
+      linkedin: business.linkedin || '',
+    },
+  });
+}
+
+const SiteContext = createContext({ site: DEFAULT_SITE, loaded: false, refresh: () => {}, replace: () => {} });
+
+export function SiteProvider({ children }) {
+  const [site, setSite] = useState(DEFAULT_SITE);
+  const [loaded, setLoaded] = useState(false);
+
+  const replace = useCallback((next) => {
+    if (!next) return;
+    applyBusiness(next.business);
+    setSite(next);
+  }, []);
+
+  const refresh = useCallback(
+    () =>
+      api
+        .getSite()
+        .then((res) => replace(res.site))
+        .catch(() => {})
+        .finally(() => setLoaded(true)),
+    [replace]
+  );
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  const value = useMemo(() => ({ site, loaded, refresh, replace }), [site, loaded, refresh, replace]);
+  return <SiteContext.Provider value={value}>{children}</SiteContext.Provider>;
+}
+
+export function useSite() {
+  return useContext(SiteContext);
+}
+
+/** The announcement to show right now, or null (disabled, empty, or outside its dates). */
+export function activeAnnouncement(announcement, locale, today = new Date().toISOString().slice(0, 10)) {
+  if (!announcement?.enabled) return null;
+  const text = announcement.text?.[locale] || announcement.text?.en;
+  if (!text) return null;
+  if (announcement.startsAt && today < announcement.startsAt) return null;
+  if (announcement.endsAt && today > announcement.endsAt) return null;
+  return {
+    text,
+    linkLabel: announcement.linkLabel?.[locale] || announcement.linkLabel?.en || '',
+    href: announcement.href || '',
+    tone: announcement.tone || 'night',
+  };
+}

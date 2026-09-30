@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const kwentraController = require('../controllers/kwentraController');
 const paymentController = require('../controllers/paymentController');
+const { requireAdmin } = require('../middleware/adminAuth');
 
 const router = Router();
 
@@ -35,10 +36,10 @@ router.get('/projects', async (req, res, next) => {
     next(err);
   }
 });
-router.get('/reservations', kwentraController.listReservationsHandler);
-router.get('/profiles/:profileId', kwentraController.getGuestProfileHandler);
-router.put('/profiles/:profileId', kwentraController.updateGuestProfileHandler);
-router.post('/guests', kwentraController.sendGuestHandler);
+router.get('/reservations', requireAdmin, kwentraController.listReservationsHandler);
+router.get('/profiles/:profileId', requireAdmin, kwentraController.getGuestProfileHandler);
+router.put('/profiles/:profileId', requireAdmin, kwentraController.updateGuestProfileHandler);
+router.post('/guests', requireAdmin, kwentraController.sendGuestHandler);
 router.get('/availability', kwentraController.getAvailability);
 router.get('/availability/:unitId', kwentraController.getAvailability);
 router.post('/quote', kwentraController.getQuote);

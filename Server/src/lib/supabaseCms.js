@@ -1,6 +1,8 @@
 const { randomUUID } = require('crypto');
 const { getSupabase } = require('../config/supabase');
 const {
+  destinationFromRow,
+  destinationToRow,
   compoundFromRow,
   compoundToRow,
   unitFromRow,
@@ -9,9 +11,20 @@ const {
   slideToRow,
   settingsFromRow,
   bookingFromRow,
+  bookingToRow,
 } = require('./mappers');
-const { compounds: seedCompounds, listings: seedListings, propertyTypes, partners, trustPoints, faqs } =
-  require('../data/mock');
+const {
+  destinations: seedDestinations,
+  compounds: seedCompounds,
+  listings: seedListings,
+  propertyTypes,
+  partners,
+  trustPoints,
+  faqs,
+} = require('../data/mock');
+const { brandFromName } = require('../data/inventory');
+const { COMPOUND_FIELDS, UNIT_FIELDS, applyFields, defaults, syncCoords } = require('./fields');
+const { normalizeSite, mergeSite, sanitizeContentLists } = require('./siteContent');
 
 function throwSb(error, fallback = 'Database error') {
   const err = new Error(error?.message || fallback);
@@ -24,10 +37,17 @@ function sortBy(arr, key) {
   return [...arr].sort((a, b) => (Number(a[key]) || 0) - (Number(b[key]) || 0));
 }
 
+function conflict(message) {
+  const err = new Error(message);
+  err.status = 409;
+  return err;
+}
+
 function slugify(text) {
   return String(text || '')
     .toLowerCase()
     .trim()
+    .replace(/&/g, 'and')
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -69,6 +89,15 @@ function defaultContent() {
   return { propertyTypes, partners, trustPoints, faqs };
 }
 
+async function listDestinations() {
+  const { data, error } = await getSupabase()
+    .from('destinations')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) throwSb(error);
+  return (data || []).map(destinationFromRow);
+}
+
 async function listCompounds() {
   const { data, error } = await getSupabase()
     .from('compounds')
@@ -107,14 +136,22 @@ async function getSettingsRow() {
 }
 
 async function getDashboard() {
-  const [units, compounds, slides] = await Promise.all([listUnits(), listCompounds(), listSlides()]);
+  const [units, compounds, destinations, slides, bookings] = await Promise.all([
+    listUnits(),
+    listCompounds(),
+    listDestinations(),
+    listSlides(),
+    getSupabase().from('bookings').select('id', { count: 'exact', head: true }),
+  ]);
   return {
     counts: {
+      destinations: destinations.length,
+      compounds: compounds.length,
       units: units.length,
       publishedUnits: units.filter((u) => u.published !== false).length,
       featuredUnits: units.filter((u) => u.featured).length,
-      compounds: compounds.length,
       slides: slides.length,
+      bookings: bookings.count || 0,
     },
     updatedAt: new Date().toISOString(),
   };
@@ -137,6 +174,15 @@ async function getPublicCompounds({ homeOnly = false } = {}) {
   const { data, error } = await q;
   if (error) throwSb(error);
   return (data || []).map(compoundFromRow);
+}
+
+async function getPublicDestinations({ homeOnly = false } = {}) {
+  let q = getSupabase().from('destinations').select('*').eq('published', true);
+  if (homeOnly) q = q.eq('show_on_home', true);
+  q = q.order('sort_order', { ascending: true });
+  const { data, error } = await q;
+  if (error) throwSb(error);
+  return (data || []).map(destinationFromRow);
 }
 
 async function getSlideshow() {
@@ -165,6 +211,33 @@ async function getContent() {
   return content;
 }
 
+async function upsertSettingsColumns(columns) {
+  const { data, error } = await getSupabase()
+    .from('site_settings')
+    .upsert({ id: 'default', ...columns, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+    .select('*')
+    .single();
+  if (error) throwSb(error);
+  return settingsFromRow(data);
+}
+
+async function saveContent(body) {
+  const current = await getContent();
+  const row = await upsertSettingsColumns({ content: sanitizeContentLists(body, current) });
+  return row.content;
+}
+
+async function getSite() {
+  const row = await getSettingsRow();
+  return normalizeSite(row.site);
+}
+
+async function saveSite(patch) {
+  const row = await getSettingsRow();
+  const saved = await upsertSettingsColumns({ site: mergeSite(row.site, patch) });
+  return normalizeSite(saved.site);
+}
+
 async function findUnit(idOrSlug) {
   const sb = getSupabase();
   let { data, error } = await sb.from('units').select('*').eq('id', idOrSlug).maybeSingle();
@@ -180,6 +253,124 @@ async function findCompound(id) {
   const { data, error } = await getSupabase().from('compounds').select('*').eq('id', id).maybeSingle();
   if (error) throwSb(error);
   return compoundFromRow(data);
+}
+
+async function findDestination(id) {
+  const { data, error } = await getSupabase().from('destinations').select('*').eq('id', id).maybeSingle();
+  if (error) throwSb(error);
+  return destinationFromRow(data);
+}
+
+/** Denormalized copies: property ← destination name, unit type ← property + destination. */
+async function linkCompound(compound) {
+  const dest = compound.destinationId ? await findDestination(compound.destinationId) : null;
+  compound.region = dest?.name || compound.region || '';
+  compound.brand = compound.brand || brandFromName(compound.name);
+  return compound;
+}
+
+async function linkUnit(unit) {
+  const compound = unit.compoundId ? await findCompound(unit.compoundId) : null;
+  if (!compound) return unit;
+  unit.compound = compound.name;
+  unit.brand = compound.brand || '';
+  unit.destinationId = compound.destinationId || '';
+  unit.destination = compound.region || '';
+  unit.region = compound.region || '';
+  if (!unit.city) unit.city = compound.city || '';
+  return unit;
+}
+
+async function syncUnitsForCompound(compound) {
+  const { error } = await getSupabase()
+    .from('units')
+    .update({
+      compound: compound.name,
+      brand: compound.brand || '',
+      destination_id: compound.destinationId || '',
+      destination: compound.region || '',
+      region: compound.region || '',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('compound_id', compound.id);
+  if (error) throwSb(error);
+}
+
+async function refreshUnitCount(compoundId) {
+  if (!compoundId) return;
+  const { count, error } = await getSupabase()
+    .from('units')
+    .select('id', { count: 'exact', head: true })
+    .eq('compound_id', compoundId)
+    .eq('published', true);
+  if (error) throwSb(error);
+  await getSupabase().from('compounds').update({ unit_count: count || 0 }).eq('id', compoundId);
+}
+
+/* ——— Destinations CRUD ——— */
+async function createDestination(body) {
+  const id = body.id || slugify(body.name);
+  if (await findDestination(id)) throw conflict('Destination id already exists');
+  const all = await listDestinations();
+  const item = {
+    id,
+    name: body.name,
+    description: body.description || '',
+    image: body.image || '',
+    sortOrder: all.length,
+    showOnHome: body.showOnHome !== false,
+    published: body.published !== false,
+    kwentraDestinationId: body.kwentraDestinationId || '',
+  };
+  const { data, error } = await getSupabase()
+    .from('destinations')
+    .insert(destinationToRow(item))
+    .select('*')
+    .single();
+  if (error) throwSb(error);
+  return destinationFromRow(data);
+}
+
+async function updateDestination(id, body) {
+  const current = await findDestination(id);
+  if (!current) return null;
+  const next = { ...current };
+  for (const key of ['name', 'description', 'image', 'sortOrder', 'showOnHome', 'published', 'kwentraDestinationId']) {
+    if (body?.[key] !== undefined) next[key] = body[key];
+  }
+  const { data, error } = await getSupabase()
+    .from('destinations')
+    .update(destinationToRow(next))
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throwSb(error);
+  if (body?.name !== undefined) {
+    const compounds = (await listCompounds()).filter((c) => c.destinationId === id);
+    for (const c of compounds) {
+      c.region = next.name;
+      await getSupabase().from('compounds').update({ region: next.name }).eq('id', c.id);
+      await syncUnitsForCompound(c);
+    }
+  }
+  return destinationFromRow(data);
+}
+
+async function deleteDestination(id) {
+  const compounds = await listCompounds();
+  if (compounds.some((c) => c.destinationId === id)) {
+    throw conflict('Move or delete the properties in this destination first');
+  }
+  const { error } = await getSupabase().from('destinations').delete().eq('id', id);
+  if (error) throwSb(error);
+  const remaining = await listDestinations();
+  return reorderDestinations(remaining.map((d) => d.id));
+}
+
+async function reorderDestinations(ids) {
+  const sb = getSupabase();
+  await Promise.all(ids.map((id, index) => sb.from('destinations').update({ sort_order: index }).eq('id', id)));
+  return listDestinations();
 }
 
 /* ——— Slideshow CRUD ——— */
@@ -234,26 +425,24 @@ async function reorderSlides(ids) {
 /* ——— Compounds CRUD ——— */
 async function createCompound(body) {
   const id = body.id || slugify(body.name);
-  const existing = await findCompound(id);
-  if (existing) {
-    const err = new Error('Compound id already exists');
-    err.status = 409;
-    throw err;
-  }
+  if (await findCompound(id)) throw conflict('Property id already exists');
   const compounds = await listCompounds();
-  const item = {
+  const item = await linkCompound({
     id,
     name: body.name,
-    region: body.region || '',
+    brand: body.brand || brandFromName(body.name),
     destinationId: body.destinationId || '',
-    unitCount: Number(body.unitCount) || 0,
+    region: body.region || '',
+    city: body.city || '',
+    unitCount: 0,
     image: body.image || '',
     sortOrder: compounds.length,
     showOnHome: body.showOnHome !== false,
     published: body.published !== false,
     kwentraProjectId: body.kwentraProjectId || '',
     kwentraDestinationId: body.kwentraDestinationId || '',
-  };
+    ...syncCoords(applyFields(defaults(COMPOUND_FIELDS), body, COMPOUND_FIELDS), body),
+  });
   const { data, error } = await getSupabase()
     .from('compounds')
     .insert(compoundToRow(item))
@@ -269,10 +458,10 @@ async function updateCompound(id, body) {
   const next = { ...current };
   const fields = [
     'name',
-    'region',
+    'brand',
     'destinationId',
+    'city',
     'image',
-    'unitCount',
     'showOnHome',
     'published',
     'sortOrder',
@@ -282,7 +471,9 @@ async function updateCompound(id, body) {
   for (const key of fields) {
     if (body?.[key] !== undefined) next[key] = body[key];
   }
-  if (body?.unitCount !== undefined) next.unitCount = Number(body.unitCount) || 0;
+  applyFields(next, body, COMPOUND_FIELDS);
+  syncCoords(next, body);
+  await linkCompound(next);
   const { data, error } = await getSupabase()
     .from('compounds')
     .update(compoundToRow(next))
@@ -290,10 +481,16 @@ async function updateCompound(id, body) {
     .select('*')
     .single();
   if (error) throwSb(error);
+  await syncUnitsForCompound(next);
   return compoundFromRow(data);
 }
 
 async function deleteCompound(id) {
+  const { count } = await getSupabase()
+    .from('units')
+    .select('id', { count: 'exact', head: true })
+    .eq('compound_id', id);
+  if (count) throw conflict('Delete or move the unit types in this property first');
   const { error } = await getSupabase().from('compounds').delete().eq('id', id);
   if (error) throwSb(error);
   const remaining = await listCompounds();
@@ -312,23 +509,17 @@ async function reorderCompounds(ids) {
 /* ——— Units CRUD ——— */
 async function createUnit(body) {
   const slug = body.slug || slugify(body.title);
-  if (await findUnit(slug)) {
-    const err = new Error('Slug already exists');
-    err.status = 409;
-    throw err;
-  }
-  const compound = body.compoundId ? await findCompound(body.compoundId) : null;
+  if (await findUnit(slug)) throw conflict('Slug already exists');
   const units = await listUnits();
   const item = {
     id: newId('unit'),
     slug,
     title: body.title,
+    unitType: body.unitType || '',
     compoundId: body.compoundId || '',
-    compound: body.compound || compound?.name || '',
-    region: body.region || compound?.region || '',
     city: body.city || '',
-    propertyType: body.propertyType || 'Apartment',
-    bedrooms: Number(body.bedrooms) || 1,
+    propertyType: body.propertyType || (body.unitType === 'Studio' ? 'Studio' : 'Apartment'),
+    bedrooms: Number(body.bedrooms) || 0,
     bathrooms: Number(body.bathrooms) || 1,
     areaSqm: Number(body.areaSqm) || 0,
     maxGuests: Number(body.maxGuests) || 2,
@@ -348,9 +539,12 @@ async function createUnit(body) {
     averageRating: body.averageRating || 0,
     reviewCount: body.reviewCount || 0,
     reviews: Array.isArray(body.reviews) ? body.reviews : [],
+    ...applyFields(defaults(UNIT_FIELDS), body, UNIT_FIELDS),
   };
+  await linkUnit(item);
   const { data, error } = await getSupabase().from('units').insert(unitToRow(item)).select('*').single();
   if (error) throwSb(error);
+  await refreshUnitCount(item.compoundId);
   return unitFromRow(data);
 }
 
@@ -361,9 +555,8 @@ async function updateUnit(idOrSlug, body) {
   const scalar = [
     'title',
     'slug',
+    'unitType',
     'compoundId',
-    'compound',
-    'region',
     'city',
     'propertyType',
     'currency',
@@ -386,11 +579,8 @@ async function updateUnit(idOrSlug, body) {
   if (Array.isArray(body.amenities)) next.amenities = body.amenities;
   if (Array.isArray(body.facilities)) next.facilities = body.facilities;
   if (Array.isArray(body.images)) next.images = body.images;
-  if (body.compoundId) {
-    const compound = await findCompound(body.compoundId);
-    if (compound && !body.compound) next.compound = compound.name;
-    if (compound && !body.region) next.region = compound.region;
-  }
+  applyFields(next, body, UNIT_FIELDS);
+  await linkUnit(next);
   const { data, error } = await getSupabase()
     .from('units')
     .update(unitToRow(next))
@@ -398,6 +588,8 @@ async function updateUnit(idOrSlug, body) {
     .select('*')
     .single();
   if (error) throwSb(error);
+  await refreshUnitCount(next.compoundId);
+  if (current.compoundId !== next.compoundId) await refreshUnitCount(current.compoundId);
   return unitFromRow(data);
 }
 
@@ -406,6 +598,7 @@ async function deleteUnit(idOrSlug) {
   if (!current) return listUnits();
   const { error } = await getSupabase().from('units').delete().eq('id', current.id);
   if (error) throwSb(error);
+  await refreshUnitCount(current.compoundId);
   const remaining = await listUnits();
   await reorderSearchUnits(remaining.map((u) => u.id));
   return listUnits();
@@ -460,24 +653,33 @@ async function saveSettings(body) {
 }
 
 /* ——— Bookings ——— */
+async function nextVoucherSerial() {
+  const { data, error } = await getSupabase().rpc('next_voucher_serial');
+  if (error) throwSb(error, 'Run supabase/schema.sql to create next_voucher_serial()');
+  return Number(data);
+}
+
 async function createBooking(booking) {
-  const row = {
-    id: booking.id,
-    status: booking.status || 'requested',
-    slug: booking.slug,
-    listing_id: booking.listingId,
-    listing_title: booking.listingTitle,
-    name: booking.name,
-    email: booking.email,
-    phone: booking.phone,
-    guests: booking.guests,
-    check_in: booking.checkIn,
-    check_out: booking.checkOut,
-    notes: booking.notes,
-    price_per_night: booking.pricePerNight,
-    currency: booking.currency,
-  };
-  const { data, error } = await getSupabase().from('bookings').insert(row).select('*').single();
+  const { data, error } = await getSupabase()
+    .from('bookings')
+    .insert(bookingToRow(booking))
+    .select('*')
+    .single();
+  if (error) throwSb(error);
+  return bookingFromRow(data);
+}
+
+async function updateBooking(id, patch) {
+  const row = {};
+  if (patch.status !== undefined) row.status = patch.status;
+  if (patch.paymentStatus !== undefined) row.payment_status = patch.paymentStatus;
+  if (patch.kwentraReservationId !== undefined) row.kwentra_reservation_id = patch.kwentraReservationId;
+  const { data, error } = await getSupabase()
+    .from('bookings')
+    .update(row)
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
   if (error) throwSb(error);
   return bookingFromRow(data);
 }
@@ -491,48 +693,22 @@ async function listBookings() {
   return (data || []).map(bookingFromRow);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function findBooking(id) {
-  const { data, error } = await getSupabase().from('bookings').select('*').eq('id', id).maybeSingle();
+  const column = UUID_RE.test(String(id)) ? 'id' : 'voucher_number';
+  const { data, error } = await getSupabase().from('bookings').select('*').eq(column, id).maybeSingle();
   if (error) throwSb(error);
   return bookingFromRow(data);
-}
-
-/* ——— Guests ——— */
-async function findGuestByEmail(email) {
-  const key = String(email || '').toLowerCase();
-  const { data, error } = await getSupabase().from('guests').select('*').eq('email', key).maybeSingle();
-  if (error) throwSb(error);
-  return data;
-}
-
-async function createGuest({ name, email, password }) {
-  const row = {
-    email: String(email).toLowerCase(),
-    name: name || String(email).split('@')[0],
-    password,
-  };
-  const { data, error } = await getSupabase().from('guests').insert(row).select('*').single();
-  if (error) {
-    if (error.code === '23505') {
-      const err = new Error('Account already exists');
-      err.status = 409;
-      throw err;
-    }
-    throwSb(error);
-  }
-  return { id: data.id, name: data.name, email: data.email };
-}
-
-async function findGuestById(id) {
-  const { data, error } = await getSupabase().from('guests').select('*').eq('id', id).maybeSingle();
-  if (error) throwSb(error);
-  if (!data) return null;
-  return { id: data.id, name: data.name, email: data.email, password: data.password };
 }
 
 async function seedIfEmpty() {
   const compounds = await listCompounds();
   if (compounds.length) return { seeded: false };
+
+  const destinationRows = seedDestinations.map(destinationToRow);
+  const { error: dErr } = await getSupabase().from('destinations').upsert(destinationRows);
+  if (dErr) throwSb(dErr);
 
   const compoundRows = seedCompounds.map((c, i) =>
     compoundToRow({
@@ -586,11 +762,17 @@ module.exports = {
   getDashboard,
   getPublicUnits,
   getPublicCompounds,
+  getPublicDestinations,
   getSlideshow,
   getSettings,
   getContent,
+  saveContent,
+  getSite,
+  saveSite,
   findUnit,
   findCompound,
+  findDestination,
+  listDestinations,
   listCompounds,
   listUnits,
   listSlides,
@@ -598,6 +780,10 @@ module.exports = {
   updateSlide,
   deleteSlide,
   reorderSlides,
+  createDestination,
+  updateDestination,
+  deleteDestination,
+  reorderDestinations,
   createCompound,
   updateCompound,
   deleteCompound,
@@ -608,12 +794,11 @@ module.exports = {
   reorderHomeUnits,
   reorderSearchUnits,
   saveSettings,
+  nextVoucherSerial,
   createBooking,
+  updateBooking,
   listBookings,
   findBooking,
-  findGuestByEmail,
-  createGuest,
-  findGuestById,
   seedIfEmpty,
   DEFAULT_SLIDESHOW,
   defaultContent,

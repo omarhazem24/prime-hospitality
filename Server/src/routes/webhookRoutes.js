@@ -2,19 +2,18 @@ const { Router } = require('express');
 const payment = require('../services/paymentService');
 const kwentra = require('../services/kwentraService');
 const sync = require('../services/kwentraSync');
-const { listBookings } = require('../lib/cmsStore');
+const { listBookings, updateBooking } = require('../lib/cmsStore');
 
 const router = Router();
 
 async function markPaidAndPush(booking, { provider, transactionId, merchantOrderId }) {
   if (!booking) return null;
-  booking.paymentStatus = 'paid';
-  booking.status = 'confirmed';
+  await updateBooking(booking.id, { status: 'confirmed', paymentStatus: 'paid' });
   if (booking.kwentraReservationId && kwentra.isConfigured()) {
     return sync.pushPayment({
       reservationId: booking.kwentraReservationId,
-      amount: booking.amount,
-      currency: booking.currency || 'EGP',
+      amount: booking.rateAmount ?? booking.amount,
+      currency: booking.rateCurrency || booking.currency || 'EGP',
       merchantOrderId: merchantOrderId || booking.externalRef,
       provider,
       transactionId,

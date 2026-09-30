@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Check, Heart, X } from 'lucide-react';
+import { ArrowUpRight, Check, Heart, MapPin, X } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
-import BookingDrawer from '../components/booking/BookingDrawer';
+import BookingModal from '../components/booking/BookingModal';
 import ListingCard from '../components/ListingCard';
-import KeyLine from '../components/ui/KeyLine';
+import Img from '../components/ui/Img';
 import PageHeader from '../components/ui/PageHeader';
 import api from '../api/client';
 import { GUEST_AVAILABILITY_MONTHS } from '../constants/availability';
-import { brand, formatMoney, listingWhatsAppMessage, whatsappHref } from '../theme/brand';
-import { useAuth } from '../context/AuthContext';
+import { formatMoney, listingWhatsAppMessage, whatsappHref } from '../theme/brand';
 import { useLocale } from '../context/LocaleContext';
+import { useSite } from '../context/SiteContext';
 import { useWishlist } from '../context/WishlistContext';
+import { applySeo } from '../components/SeoManager';
 import { cn } from '../utils/cn';
 
 const GUEST_REGULATION_KEYS = [
@@ -30,16 +31,65 @@ function localISO(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
-function Spec({ num, label }) {
+function Spec({ num, unit, label }) {
   return (
-    <div className="border border-prime-line bg-prime-surface px-3 py-4 text-center">
-      <div className="font-display text-[1.65rem] font-bold leading-none tracking-[-0.03em] text-prime-ink">
+    <div className="px-2 py-6 text-center">
+      <div className="font-display text-[2rem] font-medium leading-none text-prime-ink sm:text-[2.4rem]">
         {num}
+        {unit ? <span className="ms-1 font-sans text-sm font-light text-prime-muted">{unit}</span> : null}
       </div>
-      <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-prime-muted">
-        {label}
-      </div>
+      <div className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-prime-muted sm:tracking-[0.24em]">{label}</div>
     </div>
+  );
+}
+
+/** Google map loads only on request — no third-party request until the guest asks for it */
+function LocationSection({ property, title }) {
+  const { t } = useLocale();
+  const [showMap, setShowMap] = useState(false);
+  const hasPin = property.latitude != null && property.longitude != null;
+  const query = hasPin ? `${property.latitude},${property.longitude}` : [property.address, property.city].filter(Boolean).join(', ');
+  const mapsHref = property.mapsUrl || (query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : '');
+  if (!property.address && !hasPin && !mapsHref) return null;
+
+  return (
+    <section id="location" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+      <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">{t('listing.location')}</h2>
+      <p className="mt-4 flex items-start gap-2.5 text-[15px] font-light text-prime-ink/85">
+        <MapPin size={16} strokeWidth={1.6} className="mt-1 shrink-0 text-prime-gold" aria-hidden />
+        <span>{[property.name, property.address || property.city].filter(Boolean).join(' — ')}</span>
+      </p>
+      {query ? (
+        <div className="relative mt-6 aspect-[16/9] overflow-hidden bg-prime-mist">
+          {showMap ? (
+            <iframe
+              title={t('listing.mapTitle', { name: property.name || title })}
+              src={`https://www.google.com/maps?q=${encodeURIComponent(query)}&z=16&output=embed`}
+              className="absolute inset-0 h-full w-full border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowMap(true)}
+              className="absolute inset-0 grid place-items-center text-[11px] font-medium uppercase tracking-[0.22em] text-prime-ink transition hover:bg-prime-line/40"
+            >
+              <span className="inline-flex items-center gap-2 border border-prime-ink/30 bg-prime-surface px-5 py-3">
+                <MapPin size={14} strokeWidth={1.6} aria-hidden />
+                {t('listing.showMap')}
+              </span>
+            </button>
+          )}
+        </div>
+      ) : null}
+      {mapsHref ? (
+        <a href={mapsHref} target="_blank" rel="noreferrer" className="prime-link mt-5 inline-flex items-center gap-1.5">
+          {t('listing.openInMaps')}
+          <ArrowUpRight size={14} strokeWidth={1.6} aria-hidden />
+        </a>
+      ) : null}
+    </section>
   );
 }
 
@@ -51,7 +101,7 @@ function ExpandableText({ text, limit = 320 }) {
   const shown = !needs || open ? text : `${text.slice(0, limit).trim()}…`;
   return (
     <div>
-      <p className="m-0 whitespace-pre-line text-[15px] leading-relaxed text-prime-ink/85">{shown}</p>
+      <p className="m-0 whitespace-pre-line text-[16px] font-light leading-[1.85] text-prime-ink/85">{shown}</p>
       {needs && (
         <button
           type="button"
@@ -67,7 +117,7 @@ function ExpandableText({ text, limit = 320 }) {
 
 function CheckRow({ children }) {
   return (
-    <div className="flex items-start gap-3 text-[14.5px] text-prime-ink">
+    <div className="flex items-start gap-3 text-[15px] font-light text-prime-ink">
       <Check size={15} strokeWidth={2} className="mt-0.5 shrink-0 text-prime-gold" aria-hidden />
       <span>{children}</span>
     </div>
@@ -79,24 +129,42 @@ export default function ListingDetailPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, localeTag } = useLocale();
-  const { user } = useAuth();
   const { has, toggle } = useWishlist();
   const [listing, setListing] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [lightbox, setLightbox] = useState(false);
   const [blocked, setBlocked] = useState([]);
   const [checkoutDates, setCheckoutDates] = useState([]);
   const [dailyPrices, setDailyPrices] = useState({});
   const [similar, setSimilar] = useState([]);
   const [reviews, setReviews] = useState([]);
-  const [reviewDraft, setReviewDraft] = useState({ rating: 5, comment: '' });
-  const [reviewMessage, setReviewMessage] = useState('');
+  const [availabilityVersion, setAvailabilityVersion] = useState(0);
 
-  const seedGuests = Number(searchParams.get('guests')) || 2;
+  const seedAdults = Number(searchParams.get('adults') || searchParams.get('guests')) || 2;
+  const seedChildren = Number(searchParams.get('children')) || 0;
   const seedCheckIn = searchParams.get('checkIn') || '';
   const seedCheckOut = searchParams.get('checkOut') || '';
+  const autoOpen = searchParams.get('book') === '1';
+
+  const { site } = useSite();
+
+  useEffect(() => {
+    if (listing && autoOpen) setBookingOpen(true);
+  }, [listing, autoOpen]);
+
+  useEffect(() => {
+    if (!listing) return;
+    applySeo(
+      {
+        title: [listing.title, listing.compound].filter(Boolean).join(' — '),
+        description: String(listing.description || '').replace(/\s+/g, ' ').slice(0, 160),
+        image: listing.images?.[0],
+      },
+      site.seo
+    );
+  }, [listing, site.seo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -157,7 +225,7 @@ export default function ListingDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, listing]);
+  }, [slug, listing, availabilityVersion]);
 
   useEffect(() => {
     if (!listing) return undefined;
@@ -190,18 +258,25 @@ export default function ListingDetailPage() {
   }, [lightbox]);
 
   const photos = listing?.images || [];
+  const property = listing?.property || null;
   const amenities = listing?.amenities || [];
-  const facilities = listing?.facilities || [];
+  const ownFacilities = listing?.facilities || [];
+  const facilities = ownFacilities.length ? ownFacilities : property?.facilities || [];
+  const facilitiesHeading = ownFacilities.length ? t('listing.facilities') : t('listing.buildingFacilities');
 
-  const locationParts = useMemo(() => {
+  const crumbs = useMemo(() => {
     if (!listing) return [];
+    const destination = listing.destination || listing.region;
     return [
-      ...new Map(
-        [listing.compound, listing.city, listing.region]
-          .filter((p) => p && String(p).trim())
-          .map((p) => [String(p).trim().toLowerCase(), String(p).trim()])
-      ).values(),
-    ];
+      destination && {
+        label: destination,
+        to: `/search?destination=${encodeURIComponent(listing.destinationId || destination)}`,
+      },
+      listing.compound && {
+        label: listing.compound,
+        to: `/search?compound=${encodeURIComponent(listing.compoundId || listing.compound)}`,
+      },
+    ].filter(Boolean);
   }, [listing]);
 
   const displayFromPrice = useMemo(() => {
@@ -217,15 +292,21 @@ export default function ListingDetailPage() {
   const detailRows = useMemo(() => {
     if (!listing) return [];
     return [
+      ...(listing.destination || listing.region
+        ? [{ label: t('bm.destination'), value: listing.destination || listing.region }]
+        : []),
+      ...(listing.compound ? [{ label: t('bm.property'), value: listing.compound }] : []),
+      ...(listing.unitType ? [{ label: t('listing.specUnitType'), value: listing.unitType }] : []),
+      ...(listing.brand ? [{ label: t('listing.specBrand'), value: `Prime ${listing.brand}` }] : []),
       { label: t('listing.specGuests'), value: String(listing.maxGuests || '—') },
       { label: t('listing.specBedrooms'), value: String(listing.bedrooms ?? '—') },
       { label: t('listing.specBaths'), value: String(listing.bathrooms ?? '—') },
       { label: t('listing.specArea'), value: listing.areaSqm ? `${listing.areaSqm} m²` : '—' },
+      ...(listing.bedType ? [{ label: t('listing.specBeds'), value: listing.bedType }] : []),
+      ...(listing.floor ? [{ label: t('listing.specFloor'), value: listing.floor }] : []),
+      ...(listing.roomCount ? [{ label: t('listing.specUnitsOfType'), value: String(listing.roomCount) }] : []),
       { label: t('listing.specCheckIn'), value: t('listing.specCheckInValue') },
       { label: t('listing.specCheckOut'), value: t('listing.specCheckOutValue') },
-      ...(listing.propertyType
-        ? [{ label: t('listing.specPropertyType'), value: listing.propertyType }]
-        : []),
     ];
   }, [listing, t]);
 
@@ -236,45 +317,26 @@ export default function ListingDetailPage() {
       : 0);
   const reviewCount = listing?.reviewCount ?? reviews.length;
 
-  function confirmBooking({ checkIn, checkOut, guests }) {
-    if (!listing) return;
-    setDrawerOpen(false);
-    const q = new URLSearchParams({
-      slug: listing.slug,
-      guests: String(guests),
-      checkIn,
-      checkOut,
-    });
-    navigate(`/checkout?${q.toString()}`);
-  }
-
-  function submitReview(e) {
-    e.preventDefault();
-    if (!user) return;
-    const comment = reviewDraft.comment.trim();
-    if (!comment) {
-      setReviewMessage(t('listing.reviewNeedComment'));
-      return;
+  function handleBooked({ booking, pms, email }) {
+    setBookingOpen(false);
+    const summary = { booking, pms, email, image: photos[0] || '' };
+    try {
+      sessionStorage.setItem(`prime.booking.${booking.voucherNumber}`, JSON.stringify(summary));
+    } catch {
+      /* private mode — the router state below still carries it */
     }
-    const guestName = user.name || user.email || t('common.guest');
-    const next = {
-      id: `local-${Date.now()}`,
-      guestName,
-      rating: Number(reviewDraft.rating) || 5,
-      comment,
-      createdAt: localISO(),
-    };
-    setReviews((prev) => [next, ...prev]);
-    setReviewDraft({ rating: 5, comment: '' });
-    setReviewMessage(t('listing.thanksReview'));
+    navigate(`/booking-success?voucher=${encodeURIComponent(booking.voucherNumber)}`, { state: summary });
   }
 
   if (loading) {
     return (
       <div>
         <Header />
-        <div className="mx-auto max-w-prime px-5 py-32 text-prime-muted sm:px-8">{t('listing.loading')}</div>
-        <Footer />
+        <main className="prime-container animate-pulse py-10" aria-busy="true" aria-label={t('listing.loading')}>
+          <div className="h-3 w-48 bg-prime-mist" />
+          <div className="mt-8 h-12 w-2/3 max-w-xl bg-prime-mist" />
+          <div className="mt-10 aspect-[4/5] bg-prime-mist sm:aspect-[16/7]" />
+        </main>
       </div>
     );
   }
@@ -283,9 +345,9 @@ export default function ListingDetailPage() {
     return (
       <div>
         <Header />
-        <main className="mx-auto max-w-prime px-5 py-28 text-center sm:px-8">
-          <PageHeader title={t('listing.notFound')} lede={error || t('listing.unavailable')} />
-          <Link to="/search" className="prime-btn mt-2 inline-flex">
+        <main className="prime-container py-28 text-center">
+          <PageHeader className="mx-auto max-w-xl" title={t('listing.notFound')} lede={error || t('listing.unavailable')} />
+          <Link to="/search" className="prime-btn">
             {t('listing.browseStays')}
           </Link>
         </main>
@@ -295,87 +357,81 @@ export default function ListingDetailPage() {
   }
 
   const loved = has(listing.id);
+  const hasPrice = Number(displayFromPrice) > 0;
   const waHref = whatsappHref(listingWhatsAppMessage(`/listings/${listing.slug}`));
 
   return (
     <div>
       <Header />
-      <main className="pb-28 pt-20 lg:pb-0">
-        <div className="mx-auto max-w-prime px-5 sm:px-8">
-          {/* Breadcrumb */}
-          <div className="py-4 text-[13px] text-prime-muted">
+      <main className="pb-28 lg:pb-0">
+        <div className="prime-container">
+          <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-x-2 gap-y-1 py-6 text-[11px] font-medium uppercase tracking-[0.2em] text-prime-muted">
             <Link to="/" className="transition hover:text-prime-ink">
               {t('listing.egypt')}
             </Link>
-            {locationParts.map((part) => (
-              <span key={part}>
-                {' · '}
-                <Link
-                  to={`/search?q=${encodeURIComponent(part)}`}
-                  className="transition hover:text-prime-ink"
-                >
-                  {part}
+            {crumbs.map((crumb) => (
+              <span key={crumb.to} className="flex items-center gap-2">
+                <span aria-hidden className="text-prime-line">/</span>
+                <Link to={crumb.to} className="transition hover:text-prime-ink">
+                  {crumb.label}
                 </Link>
               </span>
             ))}
-            {' · '}
-            <span className="text-prime-ink/70">{listing.title}</span>
-          </div>
+            <span aria-hidden className="text-prime-line">/</span>
+            <span className="text-prime-ink">{listing.unitType || listing.title}</span>
+          </nav>
 
-          {/* Title */}
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-6 md:mb-10">
             <div className="max-w-3xl">
-              {locationParts[0] && <p className="prime-eyebrow mb-2.5">{locationParts[0]}</p>}
-              <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold tracking-[-0.03em] text-prime-ink">
-                {listing.title}
-              </h1>
-              <p className="mt-2.5 text-sm text-prime-muted">
-                <strong className="font-semibold text-prime-ink">
-                  {locationParts[0] || t('listing.egypt')}
-                </strong>
-                {locationParts.length > 1 ? `, ${locationParts.slice(1).join(', ')}` : ''}
+              <p className="prime-eyebrow text-prime-gold-deep">
+                {[listing.brand && `Prime ${listing.brand}`, listing.destination || listing.region]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
-              {reviewCount > 0 && (
-                <p className="mt-2 text-sm text-prime-ink">
-                  <span className="font-semibold text-prime-gold-deep">★ {averageRating.toFixed(1)}</span>
-                  <span className="text-prime-muted">
-                    {' '}
-                    · {t('listing.reviewCount', { count: reviewCount })}
-                  </span>
-                </p>
-              )}
-              <KeyLine className="mt-5 max-w-[5rem]" />
+              <h1 className="mt-4 font-display text-display-lg font-medium text-prime-ink text-balance">{listing.title}</h1>
+              <p className="mt-4 text-[15px] font-light text-prime-muted">
+                <span className="font-normal text-prime-ink">{listing.unitType}</span>
+                {[listing.compound, listing.city].filter(Boolean).length
+                  ? ` · ${[listing.compound, listing.city].filter(Boolean).join(', ')}`
+                  : ''}
+                {reviewCount > 0 ? (
+                  <>
+                    {' · '}
+                    <span className="text-prime-gold-deep">★ {averageRating.toFixed(1)}</span>{' '}
+                    {t('listing.reviewCount', { count: reviewCount })}
+                  </>
+                ) : null}
+              </p>
             </div>
             <button
               type="button"
               onClick={() => toggle(listing.id)}
+              aria-pressed={loved}
               className={cn(
-                'inline-flex items-center gap-2 border px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] transition',
+                'inline-flex min-h-[2.75rem] items-center gap-2.5 rounded-full border px-5 text-[11px] font-medium uppercase tracking-[0.2em] transition',
                 loved
                   ? 'border-prime-gold bg-prime-gold/10 text-prime-gold-deep'
-                  : 'border-prime-line bg-prime-surface text-prime-ink hover:border-prime-gold'
+                  : 'border-prime-line text-prime-ink hover:border-prime-ink'
               )}
             >
-              <Heart size={15} fill={loved ? 'currentColor' : 'none'} />
+              <Heart size={15} strokeWidth={1.6} fill={loved ? 'currentColor' : 'none'} />
               {loved ? t('listing.saved') : t('listing.save')}
             </button>
           </div>
 
-          {/* Gallery */}
-          <div className="relative mb-8">
-            <div className="hidden overflow-hidden md:grid md:grid-cols-[2fr_1fr_1fr] md:grid-rows-[220px_220px] md:gap-2 lg:grid-rows-[240px_240px]">
+          <div className="relative mb-10 md:mb-14">
+            <div className="hidden gap-2 md:grid md:grid-cols-[2fr_1fr_1fr] md:grid-rows-[250px_250px] lg:grid-rows-[300px_300px]">
               <button
                 type="button"
                 onClick={() => setLightbox(true)}
-                className="relative row-span-2 overflow-hidden bg-prime-mist text-start"
+                className="group relative row-span-2 overflow-hidden bg-prime-mist text-start"
               >
-                <img
+                <Img
                   src={photos[0]}
                   alt={listing.title}
-                  fetchPriority="high"
-                  decoding="async"
-                  referrerPolicy="no-referrer"
-                  className="absolute inset-0 h-full w-full object-cover transition duration-700 hover:scale-[1.03]"
+                  priority
+                  sizes="(min-width: 768px) 50vw, 100vw"
+                  className="absolute inset-0 h-full w-full object-cover transition duration-[1400ms] ease-prime group-hover:scale-[1.03]"
                 />
               </button>
               {photos.slice(1, 5).map((src, i) => (
@@ -383,33 +439,33 @@ export default function ListingDetailPage() {
                   type="button"
                   key={`${src}-${i}`}
                   onClick={() => setLightbox(true)}
-                  className="relative overflow-hidden bg-prime-mist"
+                  className="group relative overflow-hidden bg-prime-mist"
                 >
-                  <img
+                  <Img
                     src={src}
                     alt={t('listing.photoAlt', { title: listing.title, n: i + 2 })}
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-700 hover:scale-[1.04]"
+                    sizes="25vw"
+                    widths={[400, 640, 900]}
+                    className="absolute inset-0 h-full w-full object-cover transition duration-[1400ms] ease-prime group-hover:scale-[1.05]"
                   />
                 </button>
               ))}
             </div>
 
-            <div className="-mx-5 flex gap-2 overflow-x-auto scroll-smooth px-5 pb-1 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:hidden">
+            <div className="prime-scroll-x -mx-5 gap-2 px-5 sm:-mx-8 sm:px-8 md:hidden">
               {photos.slice(0, 8).map((src, i) => (
                 <button
                   type="button"
                   key={`${src}-m-${i}`}
                   onClick={() => setLightbox(true)}
-                  className="relative aspect-[4/3] w-[88%] flex-none snap-start overflow-hidden bg-prime-mist"
+                  className="relative aspect-[4/5] w-[86%] flex-none snap-start overflow-hidden bg-prime-mist sm:aspect-[4/3]"
                 >
-                  <img
+                  <Img
                     src={src}
                     alt={i === 0 ? listing.title : t('listing.photoAlt', { title: listing.title, n: i + 1 })}
-                    loading={i === 0 ? 'eager' : 'lazy'}
-                    referrerPolicy="no-referrer"
+                    priority={i === 0}
+                    sizes="86vw"
+                    widths={[480, 768, 1080]}
                     className="absolute inset-0 h-full w-full object-cover"
                   />
                 </button>
@@ -419,26 +475,28 @@ export default function ListingDetailPage() {
             <button
               type="button"
               onClick={() => setLightbox(true)}
-              className="absolute bottom-4 end-4 border border-prime-line bg-prime-surface/95 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-prime-ink shadow-sm backdrop-blur-sm transition hover:border-prime-gold"
+              className="absolute bottom-4 end-4 hidden bg-white/95 px-5 py-2.5 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20] transition hover:bg-white md:inline-flex"
             >
               {t('listing.showAllPhotos', { count: photos.length })}
             </button>
           </div>
 
-          {/* Section nav */}
-          <nav className="sticky top-[4.5rem] z-30 mb-8 hidden border-y border-prime-line bg-prime-sand/95 backdrop-blur-md md:block">
-            <div className="flex gap-7 text-[13px] font-semibold text-prime-muted">
+          <nav className="sticky top-[var(--prime-header-h)] z-30 mb-10 hidden border-b border-prime-line bg-prime-sand/95 backdrop-blur-md md:block">
+            <div className="flex gap-8 text-[11px] font-medium uppercase tracking-[0.22em] text-prime-muted">
               {[
                 ['#about', t('listing.description')],
                 ['#details', t('listing.details')],
                 ['#features', t('listing.amenitiesHeading')],
+                ...(property && (property.address || property.mapsUrl || property.latitude != null)
+                  ? [['#location', t('listing.location')]]
+                  : []),
                 ['#reviews', t('listing.reviews')],
                 ['#rules', t('listing.houseRules')],
               ].map(([href, label]) => (
                 <a
                   key={href}
                   href={href}
-                  className="py-3 transition hover:text-prime-ink"
+                  className="py-4 transition hover:text-prime-ink"
                 >
                   {label}
                 </a>
@@ -446,56 +504,58 @@ export default function ListingDetailPage() {
             </div>
           </nav>
 
-          <div className="grid grid-cols-1 gap-12 pb-16 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
+          <div className="grid grid-cols-1 gap-12 pb-20 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-20">
             <div className="min-w-0">
-              <section className="mb-8 border-b border-prime-line pb-8">
-                <div className="grid grid-cols-3 gap-3">
-                  <Spec num={String(listing.maxGuests || '—')} label={t('listing.specGuests')} />
-                  <Spec num={String(listing.bedrooms ?? '—')} label={t('listing.specBedrooms')} />
-                  <Spec num={String(listing.bathrooms ?? '—')} label={t('listing.specBaths')} />
-                </div>
+              <section
+                className={cn(
+                  'mb-12 grid divide-x divide-prime-line border-y border-prime-line rtl:divide-x-reverse',
+                  listing.areaSqm ? 'grid-cols-4' : 'grid-cols-3'
+                )}
+              >
+                <Spec num={String(listing.maxGuests || '—')} label={t('listing.specGuests')} />
+                <Spec num={String(listing.bedrooms ?? '—')} label={t('listing.specBedrooms')} />
+                <Spec num={String(listing.bathrooms ?? '—')} label={t('listing.specBaths')} />
+                {listing.areaSqm ? (
+                  <Spec num={String(listing.areaSqm)} unit={t('listing.specSize')} label={t('listing.specArea')} />
+                ) : null}
               </section>
 
-              <section id="about" className="mb-8 scroll-mt-36 border-b border-prime-line pb-8">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+              <section id="about" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.description')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
                 <div className="mt-5">
                   <ExpandableText text={listing.description} />
                 </div>
               </section>
 
-              <section id="details" className="mb-8 scroll-mt-36 border-b border-prime-line pb-8">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+              <section id="details" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.details')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
                 <dl className="mt-5 grid grid-cols-1 gap-x-10 sm:grid-cols-2">
                   {detailRows.map((row) => (
                     <div
                       key={row.label}
-                      className="flex justify-between gap-4 border-b border-prime-line py-2.5 text-[14.5px]"
+                      className="flex justify-between gap-4 border-b border-prime-line py-3.5 text-[15px]"
                     >
-                      <dt className="text-prime-muted">{row.label}</dt>
-                      <dd className="m-0 text-end font-semibold text-prime-ink">{row.value}</dd>
+                      <dt className="font-light text-prime-muted">{row.label}</dt>
+                      <dd className="m-0 text-end text-prime-ink">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
               </section>
 
-              <section id="features" className="mb-8 scroll-mt-36 border-b border-prime-line pb-8">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+              <section id="features" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.features')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
-
                 {!!amenities.length && (
                   <div className="mt-6">
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
+                    <h3 className="mb-4 text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">
                       {t('listing.amenitiesHeading')}
                     </h3>
-                    <div className="mb-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="mb-9 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       {amenities.map((a) => (
                         <CheckRow key={a}>{a}</CheckRow>
                       ))}
@@ -505,10 +565,10 @@ export default function ListingDetailPage() {
 
                 {!!facilities.length && (
                   <div>
-                    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-                      {t('listing.facilities')}
+                    <h3 className="mb-4 text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">
+                      {facilitiesHeading}
                     </h3>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       {facilities.map((f) => (
                         <CheckRow key={f}>{f}</CheckRow>
                       ))}
@@ -521,124 +581,49 @@ export default function ListingDetailPage() {
                 )}
               </section>
 
-              <section id="reviews" className="mb-8 scroll-mt-36 border-b border-prime-line pb-8">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+              {property ? <LocationSection property={property} title={listing.title} /> : null}
+
+              <section id="reviews" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.reviews')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
-                <div className="mt-6 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div>
-                    {user ? (
-                      <form onSubmit={submitReview} className="space-y-3 border border-prime-line bg-prime-surface p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted">
-                          {t('listing.writeReview')}
+                {reviewCount > 0 ? (
+                  <p className="mt-3 text-[15px] font-light text-prime-muted">
+                    <span className="text-prime-gold-deep">★ {averageRating.toFixed(1)}</span> ·{' '}
+                    {t('listing.reviewCount', { count: reviews.length })}
+                  </p>
+                ) : null}
+                {reviews.length === 0 ? (
+                  <p className="mt-5 text-[15px] font-light text-prime-muted">{t('listing.noReviews')}</p>
+                ) : (
+                  <div className="mt-8 grid gap-x-10 gap-y-10 md:grid-cols-2">
+                    {reviews.map((rev) => (
+                      <figure key={rev.id}>
+                        <p className="text-[13px] tracking-[0.2em] text-prime-gold" aria-label={`${rev.rating} out of 5`}>
+                          {'★'.repeat(Math.round(rev.rating || 0))}
                         </p>
-                        <label className="block">
-                          <span className="mb-1 block text-xs text-prime-muted">{t('listing.rating')}</span>
-                          <select
-                            className="prime-input"
-                            value={reviewDraft.rating}
-                            onChange={(e) =>
-                              setReviewDraft((d) => ({ ...d, rating: Number(e.target.value) }))
-                            }
-                          >
-                            {[5, 4, 3, 2, 1].map((n) => (
-                              <option key={n} value={n}>
-                                {n}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <textarea
-                          className="prime-input min-h-[100px] resize-y"
-                          placeholder={t('listing.reviewPlaceholder')}
-                          value={reviewDraft.comment}
-                          onChange={(e) => setReviewDraft((d) => ({ ...d, comment: e.target.value }))}
-                        />
-                        <button type="submit" className="prime-btn w-full">
-                          {t('listing.submitReview')}
-                        </button>
-                      </form>
-                    ) : (
-                      <div className="border border-prime-line bg-prime-mist/50 p-5 text-sm text-prime-ink">
-                        {t('listing.signInReviewPrefix')}{' '}
-                        <Link to="/sign-in" className="font-semibold underline underline-offset-4">
-                          {t('listing.signIn')}
-                        </Link>{' '}
-                        {t('listing.signInReviewSuffix')}
-                      </div>
-                    )}
-                    {reviewMessage ? (
-                      <p className="mt-3 text-sm text-prime-gold-deep">{reviewMessage}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-4">
-                    {reviewCount > 0 && (
-                      <p className="text-sm text-prime-ink">
-                        <span className="font-semibold text-prime-gold-deep">★ {averageRating.toFixed(1)}</span>
-                        <span className="text-prime-muted">
-                          {' '}
-                          · {t('listing.reviewCount', { count: reviews.length })}
-                        </span>
-                      </p>
-                    )}
-                    {reviews.length === 0 ? (
-                      <p className="text-sm text-prime-muted">{t('listing.noReviews')}</p>
-                    ) : (
-                      reviews.map((rev) => (
-                        <article key={rev.id} className="border-b border-prime-line pb-4 last:border-0">
-                          <div className="flex flex-wrap items-baseline justify-between gap-2">
-                            <p className="font-semibold text-prime-ink">{rev.guestName}</p>
-                            <p className="text-xs text-prime-muted">
-                              {rev.createdAt
-                                ? new Date(`${rev.createdAt}T00:00:00`).toLocaleDateString(localeTag, {
-                                    month: 'short',
-                                    year: 'numeric',
-                                  })
-                                : null}
-                            </p>
-                          </div>
-                          <p className="mt-1 text-sm text-prime-gold-deep">
-                            {'★'.repeat(Math.round(rev.rating || 0))}
-                          </p>
-                          <p className="mt-2 text-sm leading-relaxed text-prime-ink/80">{rev.comment}</p>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </section>
-
-              {similar.length > 0 && (
-                <section className="mb-8 border-b border-prime-line pb-8">
-                  <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                      <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
-                        {t('listing.similarRent')}
-                      </h2>
-                      <KeyLine className="mt-3 max-w-[3.5rem]" />
-                    </div>
-                    <Link
-                      to="/search"
-                      className="text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted transition hover:text-prime-ink"
-                    >
-                      {t('listing.viewAll')}
-                    </Link>
-                  </div>
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {similar.map((item) => (
-                      <ListingCard key={item.id} listing={item} />
+                        <blockquote className="mt-3 font-display text-[1.35rem] font-medium italic leading-snug text-prime-ink">
+                          “{rev.comment}”
+                        </blockquote>
+                        <figcaption className="mt-4 text-[11px] font-medium uppercase tracking-[0.22em] text-prime-muted">
+                          {rev.guestName}
+                          {rev.createdAt
+                            ? ` · ${new Date(`${rev.createdAt}T00:00:00`).toLocaleDateString(localeTag, {
+                                month: 'short',
+                                year: 'numeric',
+                              })}`
+                            : ''}
+                        </figcaption>
+                      </figure>
                     ))}
                   </div>
-                </section>
-              )}
+                )}
+              </section>
 
-              <section id="rules" className="mb-8 scroll-mt-36 border-b border-prime-line pb-8">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+              <section id="rules" className="mb-12 scroll-mt-40 border-b border-prime-line pb-12">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.houseRules')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
                 <ul className="mt-5 space-y-2.5 p-0 text-sm">
                   <li>
                     <CheckRow>{t('listing.checkInAfter')}</CheckRow>
@@ -659,10 +644,9 @@ export default function ListingDetailPage() {
               </section>
 
               <section className="mb-4 pb-4">
-                <h2 className="font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink">
+                <h2 className="font-display text-[2rem] font-medium leading-tight text-prime-ink">
                   {t('listing.guestRegulations')}
                 </h2>
-                <KeyLine className="mt-3 max-w-[3.5rem]" />
                 <ul className="mt-5 space-y-3 p-0 text-sm">
                   {GUEST_REGULATION_KEYS.map((key) => (
                     <li key={key}>
@@ -673,92 +657,122 @@ export default function ListingDetailPage() {
               </section>
             </div>
 
-            <aside className="hidden h-fit border border-prime-line bg-prime-surface p-6 lg:sticky lg:top-28 lg:block">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-muted">
-                {t('listing.reservation')}
-              </p>
-              <p className="mt-3 font-display text-3xl font-bold tracking-[-0.03em] text-prime-ink">
-                {formatMoney(displayFromPrice, listing.currency)}
-                <span className="ms-1 text-sm font-sans font-normal tracking-normal text-prime-muted">
-                  / night
-                </span>
-              </p>
-              <KeyLine className="mt-5 max-w-[4rem]" />
-              <div className="mt-6 flex flex-col gap-3">
-                <button type="button" className="prime-btn w-full" onClick={() => setDrawerOpen(true)}>
+            <aside className="hidden h-fit bg-prime-surface p-8 shadow-premium lg:sticky lg:top-[calc(var(--prime-header-h)+5rem)] lg:block">
+              <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-prime-muted">{t('listing.reservation')}</p>
+              {hasPrice ? (
+                <>
+                  <p className="mt-4 font-display text-[2.6rem] font-medium leading-none tabular-nums text-prime-ink">
+                    {formatMoney(displayFromPrice, listing.currency)}
+                  </p>
+                  <p className="mt-2 text-[13px] font-light text-prime-muted">per night · full total shown before you pay</p>
+                </>
+              ) : (
+                <p className="mt-4 font-display text-[2rem] font-medium leading-tight text-prime-ink">{t('listing.priceOnRequest')}</p>
+              )}
+              <div className="my-7 h-px bg-prime-line" />
+              <div className="flex flex-col gap-3">
+                <button type="button" className="prime-btn w-full" onClick={() => setBookingOpen(true)}>
                   {t('listing.bookNow')}
                 </button>
-                <a
-                  href={waHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 border border-prime-line py-3.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-ink transition hover:border-prime-gold"
-                >
+                <a href={waHref} target="_blank" rel="noreferrer" className="prime-btn-outline w-full">
                   {t('listing.whatsappInquiry')}
                 </a>
               </div>
+              <p className="mt-6 text-center text-[12px] font-light leading-relaxed text-prime-muted">
+                Book direct — your voucher is issued the moment you confirm.
+              </p>
             </aside>
           </div>
         </div>
+
+        {similar.length > 0 && (
+          <section className="border-t border-prime-line bg-prime-mist/50 py-20 md:py-28">
+            <div className="prime-container">
+              <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="prime-eyebrow text-prime-gold-deep">{listing.compound}</p>
+                  <h2 className="mt-4 font-display text-display-md font-medium text-prime-ink">{t('listing.similarRent')}</h2>
+                </div>
+                <Link to="/search" className="prime-link">
+                  {t('listing.viewAll')}
+                </Link>
+              </div>
+              <div className="grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8">
+                {similar.map((item) => (
+                  <ListingCard key={item.id} listing={item} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-prime-line bg-prime-surface/95 px-4 py-3 backdrop-blur-md lg:hidden">
-        <div className="mx-auto flex max-w-prime items-center gap-3">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-prime-line bg-prime-surface/95 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden">
+        <div className="mx-auto flex max-w-prime items-center gap-4">
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-lg font-bold tabular-nums tracking-[-0.02em] text-prime-ink">
-              {formatMoney(displayFromPrice, listing.currency)}
-              <span className="ms-1 text-[11px] font-sans font-normal tracking-normal text-prime-muted">
-                / night
-              </span>
-            </p>
+            {hasPrice ? (
+              <>
+                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prime-muted">From</p>
+                <p className="truncate font-display text-[1.5rem] font-medium leading-tight tabular-nums text-prime-ink">
+                  {formatMoney(displayFromPrice, listing.currency)}
+                  <span className="ms-1 font-sans text-[12px] font-light text-prime-muted">/ night</span>
+                </p>
+              </>
+            ) : (
+              <p className="truncate font-display text-[1.25rem] font-medium leading-tight text-prime-ink">{t('listing.priceOnRequest')}</p>
+            )}
           </div>
-          <button type="button" className="prime-btn shrink-0 px-5 py-3" onClick={() => setDrawerOpen(true)}>
+          <button type="button" className="prime-btn shrink-0 px-7" onClick={() => setBookingOpen(true)}>
             {t('listing.bookNow')}
           </button>
         </div>
       </div>
 
-      <BookingDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+      <BookingModal
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
         listing={listing}
         blockedDates={blocked}
         checkoutDates={checkoutDates}
         dailyPrices={dailyPrices}
         initialCheckIn={seedCheckIn}
         initialCheckOut={seedCheckOut}
-        initialGuests={seedGuests}
-        onConfirm={confirmBooking}
+        initialAdults={seedAdults}
+        initialChildren={seedChildren}
+        onBooked={handleBooked}
+        onDatesTaken={() => setAvailabilityVersion((v) => v + 1)}
       />
 
       {lightbox && (
-        <div className="fixed inset-0 z-[280] flex flex-col bg-prime-night/95">
-          <div className="flex items-center justify-between px-5 py-4 text-prime-sand sm:px-8">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-              {t('listing.showAllPhotos', { count: photos.length })}
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('listing.showAllPhotos', { count: photos.length })}
+          className="fixed inset-0 z-[280] flex flex-col bg-[#161414]"
+          style={{ animation: 'primeFadeIn 0.4s var(--prime-ease) both' }}
+        >
+          <div className="flex items-center justify-between px-5 py-4 text-white sm:px-8">
+            <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-white/70">
+              {listing.title} · {photos.length}
             </p>
             <button
               type="button"
               onClick={() => setLightbox(false)}
-              className="grid h-10 w-10 place-items-center border border-white/25 text-prime-sand transition hover:border-prime-gold hover:text-prime-gold"
+              className="grid h-11 w-11 place-items-center rounded-full border border-white/25 transition hover:border-white"
               aria-label={t('common.close')}
             >
-              <X size={18} />
+              <X size={18} strokeWidth={1.5} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 pb-10 sm:px-8">
-            <div className="mx-auto grid max-w-4xl gap-3 md:grid-cols-2">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-10 sm:px-8">
+            <div className="mx-auto grid max-w-5xl gap-3 md:grid-cols-2">
               {photos.map((src, i) => (
-                <div
-                  key={`lb-${src}-${i}`}
-                  className={cn('overflow-hidden bg-prime-charcoal', i === 0 && 'md:col-span-2')}
-                >
-                  <img
+                <div key={`lb-${src}-${i}`} className={cn('overflow-hidden bg-white/5', i % 3 === 0 && 'md:col-span-2')}>
+                  <Img
                     src={src}
                     alt={t('listing.photoAlt', { title: listing.title, n: i + 1 })}
+                    sizes={i % 3 === 0 ? '(min-width: 1024px) 1024px, 100vw' : '(min-width: 1024px) 512px, (min-width: 768px) 50vw, 100vw'}
                     className="w-full object-cover"
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
                   />
                 </div>
               ))}

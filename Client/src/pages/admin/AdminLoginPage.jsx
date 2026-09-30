@@ -31,12 +31,15 @@ export default function AdminLoginPage() {
         className="w-full max-w-md border border-white/15 bg-prime-surface/5 p-8 backdrop-blur-md"
       >
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-gold">
-          Prime CMS
+          Prime Hospitality · Staff only
         </p>
         <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.02em] text-white">
-          Admin sign in
+          Staff sign in
         </h1>
-        <p className="mt-2 text-sm text-white/60">Control homepage, units, compounds, and pixels.</p>
+        <p className="mt-2 text-sm text-white/60">
+          Manage destinations, properties, unit types, bookings and the website. Guests don’t need an
+          account to book.
+        </p>
 
         <label className="mt-8 block">
           <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">

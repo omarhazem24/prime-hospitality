@@ -3,6 +3,7 @@ import {
   BedDouble,
   Building2,
   ChevronDown,
+  Gem,
   MapPin,
   SlidersHorizontal,
   Users,
@@ -11,8 +12,6 @@ import {
 import DateRangePicker, { formatStayDate } from '../ui/DateRangePicker';
 import { useLocale } from '../../context/LocaleContext';
 import { cn } from '../../utils/cn';
-
-const BED_OPTIONS = [0, 1, 2, 3, 4, 5];
 
 function Dropdown({
   label,
@@ -30,27 +29,23 @@ function Dropdown({
         type="button"
         onClick={onToggle}
         className={cn(
-          'flex h-full w-full items-center gap-3 px-4 py-3.5 text-start transition hover:bg-prime-mist/70 sm:px-5',
-          open && 'bg-prime-mist/80'
+          'flex h-full w-full items-center gap-3 px-4 py-3.5 text-start transition hover:bg-prime-mist/60 sm:px-5',
+          open && 'bg-prime-mist'
         )}
       >
-        {Icon ? (
-          <span className="hidden h-9 w-9 shrink-0 items-center justify-center border border-prime-line bg-white text-prime-gold sm:flex">
-            <Icon size={15} strokeWidth={1.8} />
-          </span>
-        ) : null}
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
+          <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-prime-muted">
+            {Icon ? <Icon size={12} strokeWidth={1.6} className="text-prime-gold-deep" aria-hidden /> : null}
             {label}
             <ChevronDown size={12} className={cn('opacity-60 transition', open && 'rotate-180')} />
           </span>
-          <span className="mt-1 block truncate text-sm font-medium text-prime-ink">{valueLabel}</span>
+          <span className="mt-1.5 block truncate text-[15px] text-prime-ink">{valueLabel}</span>
         </span>
       </button>
       {open ? (
         <div
           className={cn(
-            'absolute start-0 top-full z-30 mt-2 max-h-72 min-w-[220px] overflow-y-auto border border-prime-line bg-white p-1.5 shadow-premium',
+            'absolute start-0 top-full z-30 mt-2 max-h-80 min-w-[220px] overflow-y-auto border border-prime-line bg-prime-surface p-1.5 shadow-premium-lg',
             panelClassName
           )}
         >
@@ -67,7 +62,7 @@ function MenuItem({ active, onClick, title, subtitle }) {
       type="button"
       onClick={onClick}
       className={cn(
-        'flex w-full flex-col rounded-lg px-3 py-2.5 text-start transition',
+        'flex w-full flex-col px-3 py-2.5 text-start transition',
         active ? 'bg-prime-ink text-prime-sand' : 'text-prime-ink hover:bg-prime-mist'
       )}
     >
@@ -81,48 +76,44 @@ function MenuItem({ active, onClick, title, subtitle }) {
   );
 }
 
-/** Horizontal filter bar for the stays page */
-export default function StaysFiltersBar({
-  filters,
-  compounds,
-  propertyTypes,
-  regions,
-  onChange,
-  onClear,
-}) {
+function MenuGroup({ title }) {
+  return (
+    <p className="px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.22em] text-prime-gold-deep first:pt-1.5">
+      {title}
+    </p>
+  );
+}
+
+export function findDestination(destinations, value) {
+  if (!value) return null;
+  return destinations.find((d) => d.id === value || d.name === value) || null;
+}
+
+/** Horizontal filter bar for the stays page — Destination › Property › Unit type, plus brand / dates / guests */
+export default function StaysFiltersBar({ filters, destinations, unitTypes, brands, onChange, onClear }) {
   const { localeTag } = useLocale();
   const rootRef = useRef(null);
   const [openMenu, setOpenMenu] = useState(null);
 
-  const compoundsForRegion = useMemo(() => {
-    if (!filters.region) return compounds;
-    return compounds.filter((c) => c.region === filters.region);
-  }, [compounds, filters.region]);
+  const properties = useMemo(() => destinations.flatMap((d) => d.projects || []), [destinations]);
+  const destination = findDestination(destinations, filters.destination);
+  const propertyGroups = destination ? [destination] : destinations;
 
-  const compoundLabel =
-    compounds.find((c) => c.id === filters.compound)?.name || 'Any compound';
-  const typeLabel = filters.propertyType || 'All types';
-  const bedsLabel = !filters.beds
-    ? 'Any'
-    : Number(filters.beds) >= 5
-      ? '5+'
-      : `${filters.beds}+`;
+  const propertyLabel = properties.find((p) => p.id === filters.compound)?.name || 'Any property';
   const guestsLabel = filters.guests ? `${filters.guests}+` : 'Any';
   const datesLabel =
     filters.checkIn || filters.checkOut
       ? `${formatStayDate(filters.checkIn, 'Arrive', localeTag)} – ${formatStayDate(filters.checkOut, 'Depart', localeTag)}`
-      : 'Add dates';
+      : '';
 
-  const activeCount = useMemo(() => {
-    let n = 0;
-    if (filters.compound) n += 1;
-    if (filters.region) n += 1;
-    if (filters.propertyType) n += 1;
-    if (filters.guests) n += 1;
-    if (filters.beds) n += 1;
-    if (filters.checkIn || filters.checkOut) n += 1;
-    return n;
-  }, [filters]);
+  const activeCount = [
+    filters.destination,
+    filters.compound,
+    filters.unitType,
+    filters.brand,
+    filters.guests,
+    filters.checkIn || filters.checkOut,
+  ].filter(Boolean).length;
 
   useEffect(() => {
     const onOutside = (e) => {
@@ -136,84 +127,72 @@ export default function StaysFiltersBar({
     setOpenMenu((prev) => (prev === menu ? null : menu));
   }
 
+  function pick(patch) {
+    onChange(patch);
+    setOpenMenu(null);
+  }
+
   return (
     <div ref={rootRef} className="relative z-20">
-      <div className="overflow-visible border border-prime-line bg-white/90 shadow-[0_20px_50px_rgba(28,28,28,0.06)] backdrop-blur-sm">
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-prime-gold/80 to-transparent" />
-
-        <div className="grid divide-y divide-prime-line md:grid-cols-2 md:divide-x md:divide-y-0 lg:grid-cols-[1fr_1.1fr_1.25fr_0.95fr_0.7fr_0.75fr_auto]">
+      <div className="overflow-visible border border-prime-line bg-prime-surface">
+        <div className="grid divide-y divide-prime-line md:grid-cols-2 md:divide-x md:divide-y-0 lg:grid-cols-[1fr_1.2fr_1.25fr_0.85fr_0.85fr_0.7fr_auto] rtl:md:divide-x-reverse">
           <Dropdown
             label="Destination"
             icon={MapPin}
-            valueLabel={filters.region || 'All destinations'}
-            open={openMenu === 'region'}
-            onToggle={() => toggle('region')}
+            valueLabel={destination?.name || 'All destinations'}
+            open={openMenu === 'destination'}
+            onToggle={() => toggle('destination')}
           >
             <MenuItem
-              active={!filters.region}
+              active={!filters.destination}
               title="All destinations"
-              onClick={() => {
-                onChange({ region: '', compound: '', city: '' });
-                setOpenMenu(null);
-              }}
+              onClick={() => pick({ destination: '', compound: '' })}
             />
-            {regions.map((r) => (
+            {destinations.map((d) => (
               <MenuItem
-                key={r}
-                active={filters.region === r}
-                title={r}
+                key={d.id}
+                active={destination?.id === d.id}
+                title={d.name}
+                subtitle={`${d.projectCount ?? d.projects?.length ?? 0} properties`}
                 onClick={() => {
-                  const keep =
-                    compounds.find((c) => c.id === filters.compound)?.region === r
-                      ? filters.compound
-                      : '';
-                  onChange({ region: r, compound: keep, city: '' });
-                  setOpenMenu(null);
+                  const keep = (d.projects || []).some((p) => p.id === filters.compound) ? filters.compound : '';
+                  pick({ destination: d.id, compound: keep });
                 }}
               />
             ))}
           </Dropdown>
 
           <Dropdown
-            label="Compound"
+            label="Property"
             icon={Building2}
-            valueLabel={compoundLabel}
+            valueLabel={propertyLabel}
             open={openMenu === 'compound'}
             onToggle={() => toggle('compound')}
-            panelClassName="min-w-[260px]"
+            panelClassName="min-w-[280px]"
           >
-            <MenuItem
-              active={!filters.compound}
-              title="Any compound"
-              onClick={() => {
-                onChange({ compound: '' });
-                setOpenMenu(null);
-              }}
-            />
-            {compoundsForRegion.map((c) => (
-              <MenuItem
-                key={c.id}
-                active={filters.compound === c.id}
-                title={c.name}
-                subtitle={`${c.region} · ${c.unitCount} stays`}
-                onClick={() => {
-                  onChange({ compound: c.id, region: c.region });
-                  setOpenMenu(null);
-                }}
-              />
+            <MenuItem active={!filters.compound} title="Any property" onClick={() => pick({ compound: '' })} />
+            {propertyGroups.map((group) => (
+              <div key={group.id}>
+                {!destination && <MenuGroup title={group.name} />}
+                {(group.projects || []).map((p) => (
+                  <MenuItem
+                    key={p.id}
+                    active={filters.compound === p.id}
+                    title={p.name}
+                    subtitle={[p.brand && `Prime ${p.brand}`, p.city].filter(Boolean).join(' · ')}
+                    onClick={() => pick({ compound: p.id, destination: group.id })}
+                  />
+                ))}
+              </div>
             ))}
           </Dropdown>
 
           <div className="min-w-0 px-3 py-2.5 sm:px-4">
-            <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
-              Dates
-            </p>
+            <p className="mb-1.5 px-1 text-[10px] font-medium uppercase tracking-[0.24em] text-prime-muted">Dates</p>
             <DateRangePicker
               checkin={filters.checkIn || ''}
               checkout={filters.checkOut || ''}
-              onChange={({ checkin, checkout }) =>
-                onChange({ checkIn: checkin || '', checkOut: checkout || '' })
-              }
+              onChange={({ checkin, checkout }) => onChange({ checkIn: checkin || '', checkOut: checkout || '' })}
               onOpenChange={(open) => {
                 if (open) setOpenMenu(null);
               }}
@@ -221,51 +200,35 @@ export default function StaysFiltersBar({
           </div>
 
           <Dropdown
-            label="Type"
-            icon={Building2}
-            valueLabel={typeLabel}
-            open={openMenu === 'type'}
-            onToggle={() => toggle('type')}
+            label="Unit type"
+            icon={BedDouble}
+            valueLabel={filters.unitType || 'All types'}
+            open={openMenu === 'unitType'}
+            onToggle={() => toggle('unitType')}
+            panelClassName="min-w-[180px]"
           >
-            <MenuItem
-              active={!filters.propertyType}
-              title="All types"
-              onClick={() => {
-                onChange({ propertyType: '' });
-                setOpenMenu(null);
-              }}
-            />
-            {propertyTypes.map((type) => (
+            <MenuItem active={!filters.unitType} title="All types" onClick={() => pick({ unitType: '' })} />
+            {unitTypes.map((type) => (
               <MenuItem
                 key={type}
-                active={filters.propertyType === type}
+                active={filters.unitType === type}
                 title={type}
-                onClick={() => {
-                  onChange({ propertyType: type });
-                  setOpenMenu(null);
-                }}
+                onClick={() => pick({ unitType: type })}
               />
             ))}
           </Dropdown>
 
           <Dropdown
-            label="Beds"
-            icon={BedDouble}
-            valueLabel={bedsLabel}
-            open={openMenu === 'beds'}
-            onToggle={() => toggle('beds')}
-            panelClassName="min-w-[160px]"
+            label="Brand"
+            icon={Gem}
+            valueLabel={filters.brand ? `Prime ${filters.brand}` : 'All brands'}
+            open={openMenu === 'brand'}
+            onToggle={() => toggle('brand')}
+            panelClassName="min-w-[180px]"
           >
-            {BED_OPTIONS.map((n) => (
-              <MenuItem
-                key={n}
-                active={String(filters.beds || '0') === String(n)}
-                title={n === 0 ? 'Any' : n === 5 ? '5+' : `${n}+`}
-                onClick={() => {
-                  onChange({ beds: n === 0 ? '' : String(n) });
-                  setOpenMenu(null);
-                }}
-              />
+            <MenuItem active={!filters.brand} title="All brands" onClick={() => pick({ brand: '' })} />
+            {brands.map((b) => (
+              <MenuItem key={b} active={filters.brand === b} title={`Prime ${b}`} onClick={() => pick({ brand: b })} />
             ))}
           </Dropdown>
 
@@ -280,26 +243,18 @@ export default function StaysFiltersBar({
             <div className="flex items-center justify-between gap-3 px-1 py-1">
               <button
                 type="button"
-                onClick={() =>
-                  onChange({
-                    guests: String(Math.max(0, Number(filters.guests || 0) - 1) || ''),
-                  })
-                }
-                className="flex h-10 w-10 items-center justify-center border border-prime-line text-lg transition hover:border-prime-gold"
+                onClick={() => onChange({ guests: String(Math.max(0, Number(filters.guests || 0) - 1) || '') })}
+                aria-label="Fewer guests"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-prime-line text-lg transition hover:border-prime-ink"
               >
                 −
               </button>
-              <span className="font-display text-2xl text-prime-ink">
-                {filters.guests || 'Any'}
-              </span>
+              <span className="font-display text-3xl font-medium text-prime-ink">{filters.guests || 'Any'}</span>
               <button
                 type="button"
-                onClick={() =>
-                  onChange({
-                    guests: String(Math.min(12, Number(filters.guests || 0) + 1)),
-                  })
-                }
-                className="flex h-10 w-10 items-center justify-center border border-prime-line text-lg transition hover:border-prime-gold"
+                onClick={() => onChange({ guests: String(Math.min(12, Number(filters.guests || 0) + 1)) })}
+                aria-label="More guests"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-prime-line text-lg transition hover:border-prime-ink"
               >
                 +
               </button>
@@ -316,9 +271,7 @@ export default function StaysFiltersBar({
                 Clear
               </button>
             ) : null}
-            <span className="hidden text-xs text-prime-muted xl:inline">
-              {datesLabel !== 'Add dates' ? datesLabel : null}
-            </span>
+            <span className="hidden text-xs text-prime-muted xl:inline">{datesLabel || null}</span>
           </div>
         </div>
       </div>
@@ -327,39 +280,24 @@ export default function StaysFiltersBar({
 }
 
 /** Mobile full sheet — kept for small screens */
-export function StaysFiltersSheet({
-  filters,
-  compounds,
-  propertyTypes,
-  regions,
-  onChange,
-  onClear,
-  onClose,
-}) {
+export function StaysFiltersSheet({ onClose, ...props }) {
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-prime-sand">
       <div className="flex items-center justify-between border-b border-prime-line px-5 py-4">
-        <p className="font-display text-2xl text-prime-ink">Filters</p>
+        <p className="font-display text-3xl font-medium text-prime-ink">Filters</p>
         <button
           type="button"
           onClick={onClose}
-          className="border border-prime-line p-2"
+          className="grid h-10 w-10 place-items-center rounded-full border border-prime-line transition hover:border-prime-ink"
           aria-label="Close"
         >
-          <X size={16} />
+          <X size={16} strokeWidth={1.5} />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-5">
-        <StaysFiltersBar
-          filters={filters}
-          compounds={compounds}
-          propertyTypes={propertyTypes}
-          regions={regions}
-          onChange={onChange}
-          onClear={onClear}
-        />
+        <StaysFiltersBar {...props} />
       </div>
-      <div className="border-t border-prime-line p-4">
+      <div className="border-t border-prime-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         <button type="button" onClick={onClose} className="prime-btn w-full">
           Show stays
         </button>
@@ -368,16 +306,17 @@ export function StaysFiltersSheet({
   );
 }
 
-export function ActiveFilterPills({ filters, compounds, onRemove, onClear }) {
+export function ActiveFilterPills({ filters, destinations, onRemove, onClear }) {
+  const properties = destinations.flatMap((d) => d.projects || []);
   const pills = [];
-  if (filters.region) pills.push({ key: 'region', label: filters.region });
-  if (filters.city) pills.push({ key: 'city', label: filters.city });
-  if (filters.compound) {
-    const name = compounds.find((c) => c.id === filters.compound)?.name || filters.compound;
-    pills.push({ key: 'compound', label: name });
+  if (filters.destination) {
+    pills.push({ key: 'destination', label: findDestination(destinations, filters.destination)?.name || filters.destination });
   }
-  if (filters.propertyType) pills.push({ key: 'propertyType', label: filters.propertyType });
-  if (filters.beds) pills.push({ key: 'beds', label: `${filters.beds}+ beds` });
+  if (filters.compound) {
+    pills.push({ key: 'compound', label: properties.find((p) => p.id === filters.compound)?.name || filters.compound });
+  }
+  if (filters.unitType) pills.push({ key: 'unitType', label: filters.unitType });
+  if (filters.brand) pills.push({ key: 'brand', label: `Prime ${filters.brand}` });
   if (filters.guests) pills.push({ key: 'guests', label: `${filters.guests}+ guests` });
   if (filters.checkIn || filters.checkOut) {
     pills.push({
@@ -389,13 +328,13 @@ export function ActiveFilterPills({ filters, compounds, onRemove, onClear }) {
   if (!pills.length) return null;
 
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {pills.map((p) => (
         <button
           key={p.key}
           type="button"
           onClick={() => onRemove(p.key)}
-          className="inline-flex items-center gap-1.5 border border-prime-line bg-white px-3 py-1.5 text-xs text-prime-ink transition hover:border-prime-gold"
+          className="inline-flex items-center gap-1.5 rounded-full border border-prime-line bg-prime-surface px-3.5 py-1.5 text-[13px] text-prime-ink transition hover:border-prime-ink"
         >
           {p.label}
           <X size={12} />
@@ -404,7 +343,7 @@ export function ActiveFilterPills({ filters, compounds, onRemove, onClear }) {
       <button
         type="button"
         onClick={onClear}
-        className="text-xs font-semibold uppercase tracking-[0.14em] text-prime-muted hover:text-prime-ink"
+        className="ms-1 text-[11px] font-medium uppercase tracking-[0.2em] text-prime-muted underline-offset-4 hover:text-prime-ink hover:underline"
       >
         Clear all
       </button>

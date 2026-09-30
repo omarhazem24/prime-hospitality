@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ChevronDown, LayoutGrid, List } from 'lucide-react';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
-import ListingCard, { ListingCardSkeleton } from '../components/ListingCard';
+import ListingCard, { ListingCardSkeleton, ListingRow } from '../components/ListingCard';
+import Img from '../components/ui/Img';
+import { whatsappHref } from '../theme/brand';
 import PlaceCapsules from '../components/search/PlaceCapsules';
 import StaysFiltersBar, {
   ActiveFilterPills,
   StaysFiltersSheet,
+  findDestination,
 } from '../components/search/StaysFilters';
 import api from '../api/client';
 import { cn } from '../utils/cn';
@@ -19,64 +22,91 @@ const SORT_OPTIONS = [
   { id: 'beds-desc', label: 'Most bedrooms' },
 ];
 
+const PAGE_SIZE = 12;
+const CONCIERGE_AFTER = 6;
+
+const shortName = (name = '') => name.replace(/^Prime\s+(Inn|Residence|Select)\s+/i, '');
+
+function ConciergeBand() {
+  return (
+    <div className="col-span-full grid items-center gap-6 bg-[#221f20] px-7 py-10 text-white sm:px-10 md:grid-cols-[1fr_auto] md:gap-10 md:px-14 md:py-12">
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-prime-gold-soft">Prime concierge</p>
+        <p className="mt-4 font-display text-[1.9rem] font-medium leading-tight md:text-[2.3rem]">
+          Not sure which home fits? We&apos;ll match you in minutes.
+        </p>
+      </div>
+      <a
+        href={whatsappHref('Hi Prime — can you help me choose a stay?')}
+        target="_blank"
+        rel="noreferrer"
+        className="prime-btn-gold justify-self-start md:justify-self-end"
+      >
+        Ask on WhatsApp
+      </a>
+    </div>
+  );
+}
+
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [compounds, setCompounds] = useState([]);
-  const [propertyTypes, setPropertyTypes] = useState([]);
+  const [destinations, setDestinations] = useState([]);
+  const [unitTypes, setUnitTypes] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const sortRef = useRef(null);
+  const view = params.get('view') === 'list' ? 'list' : 'grid';
 
-  const filters = useMemo(
-    () => ({
-      compound: params.get('compound') || '',
-      propertyType: params.get('propertyType') || '',
-      guests: params.get('guests') || '',
-      region: params.get('region') || '',
-      city: params.get('city') || '',
-      beds: params.get('beds') || '',
-      checkIn: params.get('checkIn') || '',
-      checkOut: params.get('checkOut') || '',
-      q: params.get('q') || '',
-      sort: params.get('sort') || 'recommended',
-    }),
-    [params]
-  );
+  useEffect(() => {
+    if (!sortOpen) return undefined;
+    const onDown = (e) => {
+      if (!sortRef.current?.contains(e.target)) setSortOpen(false);
+    };
+    const onKey = (e) => e.key === 'Escape' && setSortOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [sortOpen]);
 
-  const regions = useMemo(() => {
-    const set = new Set(compounds.map((c) => c.region).filter(Boolean));
-    return Array.from(set);
-  }, [compounds]);
+  const filterKey = JSON.stringify({
+    destination: params.get('destination') || params.get('region') || '',
+    compound: params.get('compound') || '',
+    unitType: params.get('unitType') || '',
+    brand: params.get('brand') || '',
+    guests: params.get('guests') || '',
+    checkIn: params.get('checkIn') || '',
+    checkOut: params.get('checkOut') || '',
+    q: params.get('q') || '',
+    sort: params.get('sort') || 'recommended',
+  });
+  const filters = useMemo(() => JSON.parse(filterKey), [filterKey]);
 
-  /** Places (compounds) inside the selected destination — or all when none selected */
+  const destination = findDestination(destinations, filters.destination);
+
+  /** Destinations at the top level; inside a destination, its properties */
   const placeCapsules = useMemo(() => {
-    const scoped = filters.region
-      ? compounds.filter((c) => c.region === filters.region)
-      : compounds;
-    return scoped.map((c) => ({ id: c.id, name: c.name, region: c.region }));
-  }, [compounds, filters.region]);
-
-  const activeFilterCount = useMemo(() => {
-    let n = 0;
-    if (filters.compound) n += 1;
-    if (filters.region) n += 1;
-    if (filters.city) n += 1;
-    if (filters.propertyType) n += 1;
-    if (filters.guests) n += 1;
-    if (filters.beds) n += 1;
-    if (filters.checkIn || filters.checkOut) n += 1;
-    return n;
-  }, [filters]);
+    if (destination) {
+      return (destination.projects || []).map((p) => ({ id: p.id, name: p.name }));
+    }
+    return destinations.map((d) => ({ id: d.id, name: d.name, count: d.projectCount }));
+  }, [destinations, destination]);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.getCompounds(), api.getMeta()])
-      .then(([cRes, mRes]) => {
+    Promise.all([api.getDestinations(), api.getMeta()])
+      .then(([dRes, mRes]) => {
         if (cancelled) return;
-        setCompounds(cRes.items || []);
-        setPropertyTypes(mRes.propertyTypes || []);
+        setDestinations(dRes.items || []);
+        setUnitTypes(mRes.unitTypes || []);
+        setBrands(mRes.brands || []);
       })
       .catch(() => {});
     return () => {
@@ -87,6 +117,7 @@ export default function SearchPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setShown(PAGE_SIZE);
     const { sort: _sort, checkIn: _ci, checkOut: _co, ...apiFilters } = filters;
     api
       .getListings(apiFilters)
@@ -121,6 +152,7 @@ export default function SearchPage() {
 
   function patchParams(patch) {
     const next = new URLSearchParams(params);
+    if ('destination' in patch) next.delete('region');
     Object.entries(patch).forEach(([key, value]) => {
       if (value === undefined || value === null || value === '') next.delete(key);
       else next.set(key, String(value));
@@ -131,42 +163,111 @@ export default function SearchPage() {
   function clearFilters() {
     const next = new URLSearchParams();
     if (filters.sort && filters.sort !== 'recommended') next.set('sort', filters.sort);
+    if (view === 'list') next.set('view', 'list');
     setParams(next);
   }
 
   function removeFilter(key) {
     if (key === 'dates') patchParams({ checkIn: '', checkOut: '' });
+    else if (key === 'destination') patchParams({ destination: '', compound: '' });
     else patchParams({ [key]: '' });
   }
 
   function selectPlace(placeId) {
-    if (!placeId) {
-      patchParams({ compound: '' });
-      return;
-    }
-    const place = placeCapsules.find((p) => p.id === placeId) || compounds.find((c) => c.id === placeId);
-    patchParams({
-      compound: placeId,
-      region: place?.region || filters.region || '',
-      city: '',
-    });
+    if (destination) patchParams({ compound: placeId });
+    else patchParams({ destination: placeId, compound: '' });
   }
 
   const sortLabel =
     SORT_OPTIONS.find((o) => o.id === filters.sort)?.label || 'Recommended';
 
+  const property = filters.compound
+    ? (destination ? [destination] : destinations)
+        .flatMap((d) => d.projects || [])
+        .find((p) => p.id === filters.compound)
+    : null;
+
+  const heading = property
+    ? shortName(property.name)
+    : destination
+      ? `Stays in ${destination.name}`
+      : filters.brand
+        ? `Prime ${filters.brand}`
+        : 'All stays';
+
+  const contextImage = property?.image || destination?.image;
+  const contextText = property?.description || destination?.description;
+  const pageItems = items.slice(0, shown);
+
+  function setView(next) {
+    const p = new URLSearchParams(params);
+    if (next === 'list') p.set('view', 'list');
+    else p.delete('view');
+    setParams(p, { replace: true });
+  }
+
   return (
     <div className="min-h-screen bg-prime-sand">
       <Header />
-      <main className="pt-16 sm:pt-20 md:pt-[5.5rem]">
-        <div className="border-b border-prime-line bg-white/80">
-          <div className="mx-auto max-w-prime space-y-3 px-5 py-3 sm:px-8 sm:py-3.5">
+      <main>
+        <section className="prime-container pb-8 pt-8 md:pb-12 md:pt-14">
+          <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-[10.5px] font-medium uppercase tracking-[0.24em] text-prime-muted">
+            <Link to="/" className="transition hover:text-prime-ink">Home</Link>
+            <span aria-hidden>/</span>
+            {destination || property ? (
+              <button type="button" onClick={() => patchParams({ destination: '', compound: '' })} className="uppercase transition hover:text-prime-ink">
+                Stays
+              </button>
+            ) : (
+              <span className="text-prime-ink">Stays</span>
+            )}
+            {destination ? (
+              <>
+                <span aria-hidden>/</span>
+                {property ? (
+                  <button type="button" onClick={() => patchParams({ compound: '' })} className="uppercase transition hover:text-prime-ink">
+                    {destination.name}
+                  </button>
+                ) : (
+                  <span className="text-prime-ink">{destination.name}</span>
+                )}
+              </>
+            ) : null}
+            {property ? (
+              <>
+                <span aria-hidden>/</span>
+                <span className="text-prime-ink">{shortName(property.name)}</span>
+              </>
+            ) : null}
+          </nav>
+
+          <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-12">
+            <div className="max-w-3xl">
+              <p className="prime-eyebrow text-prime-gold-deep">
+                {property?.brand ? `Prime ${property.brand}` : 'Book direct with Prime'}
+              </p>
+              <h1 className="mt-4 font-display text-display-lg font-medium text-prime-ink text-balance">{heading}</h1>
+              {contextText ? <p className="prime-lede mt-4 max-w-2xl">{contextText}</p> : null}
+              <p className="mt-5 text-[13px] font-medium uppercase tracking-[0.22em] text-prime-muted" aria-live="polite">
+                {loading ? 'Searching…' : `${total} ${total === 1 ? 'stay' : 'stays'} available`}
+              </p>
+            </div>
+            {contextImage ? (
+              <div className="relative hidden aspect-[4/3] w-[300px] overflow-hidden bg-prime-mist md:block lg:w-[380px]">
+                <Img src={contextImage} alt="" priority sizes="380px" widths={[480, 768]} className="prime-fade-in h-full w-full object-cover" />
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="sticky top-[var(--prime-header-h)] z-30 border-y border-prime-line bg-prime-sand/95 backdrop-blur-md">
+          <div className="prime-container space-y-3 py-3 md:py-4">
             <div className="hidden md:block">
               <StaysFiltersBar
                 filters={filters}
-                compounds={compounds}
-                propertyTypes={propertyTypes}
-                regions={regions}
+                destinations={destinations}
+                unitTypes={unitTypes}
+                brands={brands}
                 onChange={patchParams}
                 onClear={clearFilters}
               />
@@ -174,86 +275,127 @@ export default function SearchPage() {
 
             <PlaceCapsules
               places={placeCapsules}
-              selectedId={filters.compound}
+              selectedId={destination ? filters.compound : ''}
               onSelect={selectPlace}
               onOpenFilters={() => setSheetOpen(true)}
+              allLabel={destination ? `All in ${destination.name}` : 'All destinations'}
+              emptyLabel="No properties in this destination yet"
+              backLabel="Destinations"
+              onBack={destination ? () => patchParams({ destination: '', compound: '' }) : undefined}
             />
           </div>
         </div>
 
-        <div className="mx-auto max-w-prime px-5 py-4 sm:px-8 sm:py-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-prime-muted">
-              {loading ? (
-                'Searching…'
-              ) : (
-                <>
-                  <span className="font-semibold text-prime-ink">{total}</span>
-                  {` stay${total === 1 ? '' : 's'}`}
-                  {filters.region ? (
-                    <span className="text-prime-muted"> · {filters.region}</span>
-                  ) : null}
-                </>
-              )}
-            </p>
+        <div className="prime-container pb-28 pt-8 md:pt-10">
+          <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
+            <ActiveFilterPills
+              filters={filters}
+              destinations={destinations}
+              onRemove={removeFilter}
+              onClear={clearFilters}
+            />
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setSortOpen((o) => !o)}
-                className="inline-flex items-center gap-2 border border-prime-line bg-white px-4 py-2.5 text-sm text-prime-ink transition hover:border-prime-gold"
-              >
-                Sort: {sortLabel}
-                <ChevronDown size={14} className={cn(sortOpen && 'rotate-180')} />
-              </button>
-              {sortOpen ? (
-                <div className="absolute end-0 top-full z-20 mt-2 min-w-[220px] overflow-hidden border border-prime-line bg-white py-1 shadow-premium">
-                  {SORT_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        patchParams({ sort: opt.id === 'recommended' ? '' : opt.id });
-                        setSortOpen(false);
-                      }}
-                      className={cn(
-                        'block w-full px-4 py-2.5 text-start text-sm transition hover:bg-prime-mist',
-                        filters.sort === opt.id
-                          ? 'font-semibold text-prime-ink'
-                          : 'text-prime-muted'
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+            <div className="ms-auto flex items-center gap-5">
+              <div className="hidden items-center border border-prime-line sm:flex" role="group" aria-label="Layout">
+                {[
+                  ['grid', LayoutGrid, 'Grid view'],
+                  ['list', List, 'List view'],
+                ].map(([id, Icon, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setView(id)}
+                    aria-pressed={view === id}
+                    aria-label={label}
+                    className={cn(
+                      'grid h-9 w-9 place-items-center transition',
+                      view === id ? 'bg-prime-ink text-prime-sand' : 'text-prime-muted hover:text-prime-ink'
+                    )}
+                  >
+                    <Icon size={15} strokeWidth={1.5} />
+                  </button>
+                ))}
+              </div>
+
+              <div ref={sortRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSortOpen((o) => !o)}
+                  aria-expanded={sortOpen}
+                  className="inline-flex items-center gap-2 py-2 text-[11px] font-medium uppercase tracking-[0.22em] text-prime-ink transition hover:text-prime-gold-deep"
+                >
+                  <span className="text-prime-muted">Sort</span> {sortLabel}
+                  <ChevronDown size={14} className={cn('transition', sortOpen && 'rotate-180')} />
+                </button>
+                {sortOpen ? (
+                  <div className="absolute end-0 top-full z-20 mt-2 min-w-[220px] overflow-hidden border border-prime-line bg-prime-surface py-1 shadow-premium-lg">
+                    {SORT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          patchParams({ sort: opt.id === 'recommended' ? '' : opt.id });
+                          setSortOpen(false);
+                        }}
+                        className={cn(
+                          'block w-full px-4 py-2.5 text-start text-sm transition hover:bg-prime-mist',
+                          filters.sort === opt.id ? 'font-semibold text-prime-ink' : 'text-prime-muted'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          <ActiveFilterPills
-            filters={filters}
-            compounds={compounds}
-            onRemove={removeFilter}
-            onClear={clearFilters}
-          />
-
-          <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div
+            className={cn(
+              'grid',
+              view === 'list' ? 'gap-y-10 md:gap-y-12' : 'gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8'
+            )}
+          >
             {loading &&
-              Array.from({ length: 8 }).map((_, i) => <ListingCardSkeleton key={i} />)}
-            {!loading && items.map((u) => <ListingCard key={u.id} listing={u} />)}
+              Array.from({ length: view === 'list' ? 3 : 6 }).map((_, i) => <ListingCardSkeleton key={i} row={view === 'list'} />)}
+            {!loading &&
+              pageItems.map((u, i) => (
+                <Fragment key={u.id}>
+                  {view === 'list' ? (
+                    <ListingRow listing={u} priority={i < 1} />
+                  ) : (
+                    <ListingCard listing={u} priority={i < 3} />
+                  )}
+                  {i === CONCIERGE_AFTER - 1 && items.length > CONCIERGE_AFTER ? <ConciergeBand /> : null}
+                </Fragment>
+              ))}
             {!loading && !items.length && (
-              <div className="col-span-full border border-dashed border-prime-line bg-white/60 px-8 py-14 text-center">
-                <p className="font-display text-2xl font-bold text-prime-ink">No stays match</p>
-                <p className="mt-2 text-sm text-prime-muted">
-                  Try another destination, city, or clear your filters.
+              <div className="col-span-full border-y border-prime-line px-6 py-20 text-center">
+                <p className="font-display text-display-md font-medium text-prime-ink">No stays match these filters</p>
+                <p className="mx-auto mt-4 max-w-md text-[15px] font-light text-prime-muted">
+                  Try another destination or dates — or clear the filters to see every stay.
                 </p>
-                <button type="button" onClick={clearFilters} className="prime-btn mt-6">
+                <button type="button" onClick={clearFilters} className="prime-btn-outline mt-8">
                   Clear filters
                 </button>
               </div>
             )}
           </div>
+
+          {!loading && items.length > shown ? (
+            <div className="mt-16 flex flex-col items-center gap-5 text-center">
+              <p className="text-[12px] font-medium uppercase tracking-[0.22em] text-prime-muted">
+                Showing {shown} of {items.length}
+              </p>
+              <div className="h-px w-40 bg-prime-line">
+                <div className="h-px bg-prime-gold" style={{ width: `${(shown / items.length) * 100}%` }} />
+              </div>
+              <button type="button" onClick={() => setShown((n) => n + PAGE_SIZE)} className="prime-btn-outline">
+                Show more stays
+              </button>
+            </div>
+          ) : null}
         </div>
       </main>
 
@@ -261,16 +403,19 @@ export default function SearchPage() {
         <div className="fixed inset-0 z-[70]">
           <button
             type="button"
-            className="absolute inset-0 bg-prime-night/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-black/40"
             aria-label="Close filters backdrop"
             onClick={() => setSheetOpen(false)}
           />
-          <div className="absolute inset-y-0 end-0 w-full max-w-md shadow-2xl">
+          <div
+            className="absolute inset-y-0 end-0 w-full max-w-md shadow-2xl"
+            style={{ animation: 'primeSlideIn 0.45s var(--prime-ease) both' }}
+          >
             <StaysFiltersSheet
               filters={filters}
-              compounds={compounds}
-              propertyTypes={propertyTypes}
-              regions={regions}
+              destinations={destinations}
+              unitTypes={unitTypes}
+              brands={brands}
               onChange={patchParams}
               onClear={clearFilters}
               onClose={() => setSheetOpen(false)}

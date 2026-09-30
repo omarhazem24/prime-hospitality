@@ -46,9 +46,19 @@ function eachNight(from, to, fn) {
 
 /**
  * Build blocked nights + checkout turnover for a listing in [from, to).
- * Uses a seeded PRNG so the same listing always shows the same pattern.
+ * Uses a seeded PRNG over a fixed today → +12 months window, so every caller
+ * (listing calendar, booking check) sees the same pattern regardless of the range asked for.
  */
 function buildAvailability(listing, from, to) {
+  const anchor = resolveWindow({});
+  const full = buildAnchoredAvailability(listing, anchor.from, anchor.to);
+  return {
+    blocked: full.blocked.filter((b) => b.date >= from && b.date < to),
+    checkout_dates: full.checkout_dates.filter((d) => d >= from && d <= to),
+  };
+}
+
+function buildAnchoredAvailability(listing, from, to) {
   const rand = mulberry32(hashSeed(String(listing.id || listing.slug || 'prime')));
   const blockedMap = new Map();
   const checkoutSet = new Set();

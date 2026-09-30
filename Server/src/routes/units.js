@@ -1,21 +1,34 @@
 const { Router } = require('express');
-const { getPublicUnits, findUnit } = require('../lib/cmsStore');
+const { getPublicUnits, findUnit, findCompound } = require('../lib/cmsStore');
 const { resolveWindow, buildAvailability, buildPricing } = require('../lib/mockCalendar');
+const { publicProperty } = require('../services/kwentraSync');
 
 const router = Router();
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
+/** Room numbers, Drive links and sync bookkeeping are for staff only */
+function publicUnit(unit) {
+  const { unitNumbers: _n, kwentraSnapshot: _s, driveFolderUrl: _d, ...rest } = unit;
+  return rest;
+}
+
 function matchesFilters(listing, params = {}) {
-  const { compound, region, city, propertyType, guests, beds, q, featured } = params;
+  const { destination, compound, region, city, brand, unitType, propertyType, guests, beds, q, featured } =
+    params;
 
   if (featured === true || featured === 'true') {
     if (!listing.featured) return false;
+  }
+  if (destination && listing.destinationId !== destination && listing.destination !== destination) {
+    return false;
   }
   if (compound && listing.compoundId !== compound && listing.compound !== compound) {
     return false;
   }
   if (region && listing.region !== region) return false;
   if (city && listing.city !== city) return false;
+  if (brand && listing.brand !== brand) return false;
+  if (unitType && listing.unitType !== unitType) return false;
   if (propertyType && propertyType !== 'All' && listing.propertyType !== propertyType) {
     return false;
   }
@@ -29,7 +42,17 @@ function matchesFilters(listing, params = {}) {
     }
   }
   if (q) {
-    const hay = `${listing.title} ${listing.compound} ${listing.city} ${listing.region}`.toLowerCase();
+    const hay = [
+      listing.title,
+      listing.compound,
+      listing.destination,
+      listing.city,
+      listing.region,
+      listing.unitType,
+      listing.brand,
+    ]
+      .join(' ')
+      .toLowerCase();
     if (!hay.includes(String(q).toLowerCase())) return false;
   }
   return true;
@@ -39,16 +62,8 @@ router.get(
   '/',
   wrap(async (req, res) => {
     const featuredOnly = req.query.featured === true || req.query.featured === 'true';
-    const sync = require('../services/kwentraSync');
-    const { isConfigured } = require('../services/kwentraService');
-
-    let items;
-    if (isConfigured()) {
-      const merged = await sync.pullUnitsMerged({ publishedOnly: true });
-      items = merged.items || [];
-    } else {
-      items = await getPublicUnits({ featuredOnly, publishedOnly: true });
-    }
+    // Kwentra details reach the store via the background sync, so listings never wait on the PMS
+    let items = await getPublicUnits({ featuredOnly, publishedOnly: true });
 
     items = items.filter((l) => matchesFilters(l, req.query));
     if (featuredOnly) items = items.filter((l) => l.featured);
@@ -56,7 +71,7 @@ router.get(
     const total = items.length;
     const limit = req.query.limit ? Number(req.query.limit) : items.length;
     const offset = req.query.offset ? Number(req.query.offset) : 0;
-    items = items.slice(offset, offset + limit);
+    items = items.slice(offset, offset + limit).map(publicUnit);
     res.json({ items, total });
   })
 );
@@ -109,7 +124,8 @@ router.get(
     if (!item || item.published === false) {
       return res.status(404).json({ error: 'Listing not found' });
     }
-    res.json({ item });
+    const compound = item.compoundId ? await findCompound(item.compoundId) : null;
+    res.json({ item: { ...publicUnit(item), property: compound ? publicProperty(compound) : null } });
   })
 );
 

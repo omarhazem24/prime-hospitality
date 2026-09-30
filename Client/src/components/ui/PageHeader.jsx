@@ -1,6 +1,6 @@
-import KeyLine from './KeyLine';
 import { cn } from '../../utils/cn';
 
+/** Section-level heading: eyebrow, serif title, lede. */
 export default function PageHeader({
   eyebrow,
   title,
@@ -9,27 +9,28 @@ export default function PageHeader({
   tone = 'light',
   className,
   dense = false,
+  as: Heading = 'h1',
 }) {
   const isDark = tone === 'dark';
 
   return (
-    <div className={cn(dense ? 'mb-8' : 'mb-10 md:mb-12', className)}>
+    <div className={cn(dense ? 'mb-8' : 'mb-12 md:mb-16', className)}>
       {eyebrow ? (
-        <p className={cn('prime-eyebrow mb-3', isDark && 'text-prime-gold')}>{eyebrow}</p>
+        <p className={cn('prime-eyebrow mb-4', isDark ? 'text-prime-gold-soft' : 'text-prime-gold-deep')}>{eyebrow}</p>
       ) : null}
-      <h1
+      <Heading
         className={cn(
-          'font-display text-display-lg',
+          'font-display font-medium text-balance',
+          dense ? 'text-display-md' : 'text-display-lg',
           isDark ? 'text-white' : 'text-prime-ink'
         )}
       >
         {title}
-      </h1>
-      <KeyLine tone={isDark ? 'light' : 'default'} className="mt-6 max-w-[5.5rem]" />
+      </Heading>
       {lede ? (
         <p
           className={cn(
-            'mt-5 max-w-xl text-sm font-medium leading-relaxed md:text-base',
+            'mt-5 max-w-xl text-[15px] font-light leading-[1.75] md:text-[17px]',
             isDark ? 'text-white/70' : 'text-prime-muted'
           )}
         >

@@ -171,26 +171,18 @@ export default function DateRangePicker({
   const departDate = checkout ? new Date(`${checkout}T00:00:00`) : null;
 
   const shellCls = isHero
-    ? 'grid grid-cols-2 overflow-hidden rounded-xl border border-white/20 bg-white/[0.06]'
-    : 'grid grid-cols-2 overflow-hidden rounded-xl border border-prime-line bg-white';
+    ? 'grid h-full grid-cols-2'
+    : 'grid grid-cols-2 overflow-hidden border border-prime-line bg-prime-surface';
   const labelCls = isHero
-    ? 'block text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55'
-    : 'block text-[10px] font-bold uppercase tracking-wider text-prime-muted';
+    ? 'block text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted'
+    : 'block text-[10px] font-medium uppercase tracking-[0.2em] text-prime-muted';
   const valueCls = (filled) =>
     isHero
-      ? `mt-1.5 block truncate font-display text-[1.15rem] leading-none tracking-wide ${filled ? 'text-white' : 'text-white/45'}`
+      ? `mt-1.5 block truncate font-display text-[1.3rem] font-medium leading-none ${filled ? 'text-prime-ink' : 'text-prime-muted/80'}`
       : `mt-0.5 block truncate text-sm font-medium ${filled ? 'text-prime-ink' : 'text-prime-muted'}`;
   const halfActive = (field) =>
-    isHero
-      ? open && activeField === field
-        ? 'bg-white/15'
-        : 'hover:bg-white/[0.08]'
-      : open && activeField === field
-        ? 'bg-prime-mist'
-        : 'hover:bg-prime-sand';
-  const popoverCls = isHero
-    ? 'rounded-xl border border-white/25 bg-white/95 p-4 shadow-2xl backdrop-blur-xl sm:p-5'
-    : 'rounded-2xl border border-prime-line bg-white p-4 shadow-[0_18px_50px_rgba(28,28,28,0.14)]';
+    open && activeField === field ? 'bg-prime-mist' : isHero ? 'hover:bg-prime-mist/60' : 'hover:bg-prime-sand';
+  const popoverCls = 'border border-prime-line bg-prime-surface p-4 text-prime-ink shadow-premium-lg sm:p-5';
 
   const calendarPanel =
     open && popoverStyle ? (
@@ -306,8 +298,8 @@ export default function DateRangePicker({
         <button
           type="button"
           onClick={() => openPicker('arrive')}
-          className={`border-e ${isHero ? 'border-white/15' : 'border-prime-line'} ${
-            isHero ? 'px-4 py-3.5 sm:px-5' : 'px-3.5 py-2.5'
+          className={`border-e border-prime-line ${
+            isHero ? 'px-5 py-4 md:px-6 md:py-5' : 'px-3.5 py-2.5'
           } text-start transition ${halfActive('arrive')}`}
         >
           <span className={labelCls}>{isHero ? t('home.arrive') : t('common.from')}</span>
@@ -322,7 +314,7 @@ export default function DateRangePicker({
         <button
           type="button"
           onClick={() => openPicker('depart')}
-          className={`${isHero ? 'px-4 py-3.5 sm:px-5' : 'px-3.5 py-2.5'} text-start transition ${halfActive(
+          className={`${isHero ? 'px-5 py-4 md:px-6 md:py-5' : 'px-3.5 py-2.5'} text-start transition ${halfActive(
             'depart'
           )}`}
         >
