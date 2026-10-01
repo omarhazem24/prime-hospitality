@@ -34,6 +34,7 @@ const {
 } = require('../lib/cmsStore');
 const { brandFromName } = require('../data/inventory');
 const { coordsFromMapsUrl } = require('../lib/fields');
+const { isLive, withCompleteness } = require('../lib/unitCompleteness');
 
 function envPath(name, fallback = '') {
   return String(process.env[name] || fallback).trim();
@@ -82,6 +83,25 @@ function extractList(data, ...keys) {
   if (Array.isArray(data?.results)) return data.results;
   if (Array.isArray(data)) return data;
   return [];
+}
+
+/**
+ * GET every page of a Kwentra list (DRF-style `next` links), so newly added
+ * records are never missed because they landed past the first page.
+ */
+async function fetchAllPages(path, { query, keys = [], maxPages = 50 } = {}) {
+  const origin = new URL(kwentra.baseUrl()).origin;
+  const items = [];
+  let data = await kwentra.kwentraFetch(path, { query: { page_size: 1000, ...query } });
+  const first = data;
+  items.push(...extractList(data, ...keys));
+  for (let page = 1; page < maxPages && typeof data?.next === 'string' && data.next; page += 1) {
+    // Credentials go with every request — only follow links back to the Kwentra host
+    if (new URL(data.next, origin).origin !== origin) break;
+    data = await kwentra.kwentraFetch(data.next);
+    items.push(...extractList(data, ...keys));
+  }
+  return { items, raw: first };
 }
 
 function normalizeDestination(raw = {}) {
@@ -197,8 +217,7 @@ async function pullRoomTypes() {
 async function pullRoomTypesRaw() {
   const path = roomTypesPath();
   try {
-    const data = await kwentra.kwentraFetch(path);
-    return { items: extractList(data, 'room_types', 'items', 'data'), raw: data };
+    return await fetchAllPages(path, { keys: ['room_types', 'items', 'data'] });
   } catch (err) {
     err.hint =
       'Ask Kwentra for the Room Type / Inventory list API path and set KWENTRA_PATH_ROOM_TYPES.';
@@ -215,11 +234,9 @@ async function pullDestinations() {
   }
   const path = destinationsPath();
   try {
-    const data = await kwentra.kwentraFetch(path);
-    const items = extractList(data, 'destinations', 'items', 'data')
-      .map(normalizeDestination)
-      .filter((d) => d.kwentraDestinationId);
-    return { ok: true, path, items, raw: data };
+    const { items: rawItems, raw } = await fetchAllPages(path, { keys: ['destinations', 'items', 'data'] });
+    const items = rawItems.map(normalizeDestination).filter((d) => d.kwentraDestinationId);
+    return { ok: true, path, items, raw };
   } catch (err) {
     err.hint = 'Ask Kwentra for Destinations list API and set KWENTRA_PATH_DESTINATIONS.';
     throw err;
@@ -240,10 +257,11 @@ async function pullProjects({ destinationId } = {}) {
       query.destination_id = destinationId;
       query.filter_destination_id = destinationId;
     }
-    const data = await kwentra.kwentraFetch(path, { query });
-    let items = extractList(data, 'properties', 'projects', 'items', 'data')
-      .map(normalizeProject)
-      .filter((p) => p.kwentraProjectId);
+    const { items: rawItems, raw: data } = await fetchAllPages(path, {
+      query,
+      keys: ['properties', 'projects', 'items', 'data'],
+    });
+    let items = rawItems.map(normalizeProject).filter((p) => p.kwentraProjectId);
     if (destinationId) {
       items = items.filter(
         (p) => !p.kwentraDestinationId || String(p.kwentraDestinationId) === String(destinationId)
@@ -413,14 +431,14 @@ async function pullUnitsMerged({ publishedOnly = true } = {}) {
       };
     });
 
-    let list = merged;
-    if (publishedOnly) list = list.filter((u) => u.published !== false);
+    let list = merged.map(withCompleteness);
+    if (publishedOnly) list = list.filter(isLive);
 
     // Include CMS-only units (not yet mapped) so nothing disappears
     const mappedIds = new Set(merged.map((u) => String(u.kwentraRoomTypeId)));
     for (const u of cmsUnits) {
       if (u.kwentraRoomTypeId && mappedIds.has(String(u.kwentraRoomTypeId))) continue;
-      if (publishedOnly && u.published === false) continue;
+      if (publishedOnly && !isLive(u)) continue;
       list.push({ ...u, source: u.kwentraRoomTypeId ? 'cms-unmapped-pull' : 'cms-only' });
     }
 
@@ -429,7 +447,7 @@ async function pullUnitsMerged({ publishedOnly = true } = {}) {
 
   // No Kwentra catalog — CMS units (still attach Drive photos locally)
   let list = cmsUnits;
-  if (publishedOnly) list = list.filter((u) => u.published !== false);
+  if (publishedOnly) list = list.filter(isLive);
   return {
     source,
     items: list.map((u) => ({ ...u, source: 'cms' })),
@@ -720,9 +738,9 @@ function getFetch() {
 async function pullRooms() {
   const path = roomsPath();
   try {
-    const data = await kwentra.kwentraFetch(path, { query: { page_size: 1000 } });
+    const { items } = await fetchAllPages(path, { keys: ['rooms', 'items', 'data'] });
     const byType = new Map();
-    for (const room of extractList(data, 'rooms', 'items', 'data').map(normalizeRoom)) {
+    for (const room of items.map(normalizeRoom)) {
       if (!room.roomTypeId || !room.number) continue;
       if (!byType.has(room.roomTypeId)) byType.set(room.roomTypeId, { unitNumbers: [], floors: new Set() });
       const entry = byType.get(room.roomTypeId);
@@ -799,7 +817,14 @@ function pick(obj, keys) {
   return Object.fromEntries(keys.filter((k) => !isEmpty(obj[k])).map((k) => [k, obj[k]]));
 }
 
-const syncState = { running: false, last: null, timer: null };
+const syncState = {
+  running: false,
+  last: null,
+  timer: null,
+  debounce: null,
+  pending: false,
+  lastTrigger: null,
+};
 
 async function syncFromKwentra() {
   if (!kwentra.isConfigured()) {
@@ -815,6 +840,7 @@ async function syncFromKwentra() {
     destinations: { created: 0, updated: 0 },
     properties: { created: 0, updated: 0 },
     units: { created: 0, updated: 0, unchanged: 0 },
+    incomplete: { count: 0, items: [] },
     errors: [],
     needFromKwentra: [],
   };
@@ -922,8 +948,9 @@ async function syncFromKwentra() {
           ...fields,
           slug,
           compoundId: compound?.id || '',
-          images: compound?.image ? [compound.image] : [],
-          driveFolderUrl: compound?.driveFolderUrl || '',
+          // Each unit needs its own Drive gallery; the completeness check keeps it hidden until then
+          images: [],
+          driveFolderUrl: '',
           kwentraRoomTypeId: t.kwentraRoomTypeId,
           kwentraSnapshot: fields,
           published: true,
@@ -942,6 +969,16 @@ async function syncFromKwentra() {
         report.units.unchanged += 1;
       }
     }
+
+    const incomplete = (await listCmsUnits()).filter((u) => u.kwentraRoomTypeId && !u.completeness.complete);
+    report.incomplete = {
+      count: incomplete.length,
+      items: incomplete.slice(0, 50).map((u) => ({
+        id: u.id,
+        title: u.title,
+        missing: u.completeness.missing.map((m) => m.label),
+      })),
+    };
   } catch (err) {
     report.ok = false;
     fail('sync', err);
@@ -951,15 +988,39 @@ async function syncFromKwentra() {
     syncState.last = report;
     syncState.running = false;
     console.log(
-      `[kwentra-sync] ${report.ok ? 'done' : 'failed'} — units +${report.units.created} ~${report.units.updated}, properties +${report.properties.created} ~${report.properties.updated}${report.errors.length ? `, ${report.errors.length} error(s)` : ''}`
+      `[kwentra-sync] ${report.ok ? 'done' : 'failed'} — units +${report.units.created} ~${report.units.updated}, properties +${report.properties.created} ~${report.properties.updated}, ${report.incomplete.count} incomplete (hidden)${report.errors.length ? `, ${report.errors.length} error(s)` : ''}`
     );
+    if (syncState.pending) {
+      syncState.pending = false;
+      requestSync('queued during previous sync');
+    }
   }
   return report;
 }
 
+/**
+ * Ask for a sync soon (Kwentra webhook, admin actions). Bursts of events collapse into one run;
+ * events that arrive mid-sync schedule exactly one follow-up run.
+ */
+function requestSync(reason = 'manual', { delayMs = 3_000 } = {}) {
+  if (!kwentra.isConfigured()) return { queued: false, reason: 'not_configured' };
+  syncState.lastTrigger = { reason, at: new Date().toISOString() };
+  if (syncState.running) {
+    syncState.pending = true;
+    return { queued: true, when: 'after current sync' };
+  }
+  clearTimeout(syncState.debounce);
+  syncState.debounce = setTimeout(() => {
+    syncState.debounce = null;
+    syncFromKwentra().catch((err) => console.warn('[kwentra-sync]', err.message));
+  }, delayMs);
+  syncState.debounce.unref?.();
+  return { queued: true, when: `in ${Math.round(delayMs / 1000)}s` };
+}
+
 function syncMinutes() {
-  const n = Number(process.env.KWENTRA_SYNC_MINUTES ?? 30);
-  return Number.isFinite(n) && n >= 0 ? n : 30;
+  const n = Number(process.env.KWENTRA_SYNC_MINUTES ?? 5);
+  return Number.isFinite(n) && n >= 0 ? n : 5;
 }
 
 function syncStatus() {
@@ -968,6 +1029,14 @@ function syncStatus() {
     running: syncState.running,
     autoSyncMinutes: kwentra.isConfigured() ? syncMinutes() : 0,
     last: syncState.last,
+    lastTrigger: syncState.lastTrigger,
+    webhook: {
+      path: '/api/webhooks/kwentra',
+      url: process.env.PUBLIC_API_URL
+        ? `${String(process.env.PUBLIC_API_URL).replace(/\/$/, '')}/api/webhooks/kwentra`
+        : '',
+      secretConfigured: Boolean(process.env.KWENTRA_WEBHOOK_SECRET),
+    },
     paths: {
       destinations: destinationsPath(),
       properties: projectsPath(),
@@ -1009,6 +1078,7 @@ module.exports = {
   pullRooms,
   publicProperty,
   syncFromKwentra,
+  requestSync,
   syncStatus,
   startAutoSync,
 };

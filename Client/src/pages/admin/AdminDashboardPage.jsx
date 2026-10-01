@@ -11,13 +11,11 @@ const QUICK_LINKS = [
   { to: '/admin/pages', label: 'Pages & text', icon: FileText },
   { to: '/admin/marketing', label: 'Announcement & SEO', icon: Megaphone },
   { to: '/admin/settings', label: 'Business info', icon: Store },
-  { to: '/admin/sync', label: 'Import & sync', icon: RefreshCw },
+  { to: '/admin/sync', label: 'Kwentra sync', icon: RefreshCw },
 ];
 
 function buildChecks({ units, compounds, site, pixels, kwentra }) {
-  const published = units.filter((u) => u.published !== false);
-  const noPhotos = published.filter((u) => !u.images?.length).length;
-  const noPrice = published.filter((u) => !Number(u.pricePerNight)).length;
+  const incomplete = units.filter((u) => u.published !== false && u.completeness?.complete === false).length;
   const noDetails = compounds.filter((c) => !c.address || !c.mapsUrl || !c.image).length;
   const featured = units.filter((u) => u.featured && u.published !== false).length;
   const seo = site?.seo?.pages || {};
@@ -37,8 +35,13 @@ function buildChecks({ units, compounds, site, pixels, kwentra }) {
             : 'Kwentra connected; no sync since the API started.',
       to: '/admin/sync',
     },
-    { ok: !noPhotos, text: noPhotos ? `${noPhotos} published unit type(s) have no photos.` : 'Every published unit type has photos.', to: '/admin/units' },
-    { ok: !noPrice, text: noPrice ? `${noPrice} published unit type(s) show “Price on request”.` : 'Every published unit type shows a price.', to: '/admin/units' },
+    {
+      ok: !incomplete,
+      text: incomplete
+        ? `${incomplete} unit type(s) are hidden from guests until their missing fields (photos, price, details) are filled.`
+        : 'Every published unit type is complete and live.',
+      to: '/admin/units',
+    },
     { ok: !noDetails, text: noDetails ? `${noDetails} propert(ies) are missing a photo, address or map link.` : 'All properties have photo, address and map.', to: '/admin/compounds' },
     { ok: featured >= 3, text: featured >= 3 ? `${featured} unit types featured on the homepage.` : `Only ${featured} unit type(s) featured — the homepage carousel looks best with 3+.`, to: '/admin/units' },
     { ok: !seoMissing, text: seoMissing ? 'Add SEO descriptions for the main pages.' : 'Main pages have SEO descriptions.', to: '/admin/marketing' },
@@ -75,7 +78,8 @@ export default function AdminDashboardPage() {
         { label: 'Destinations', value: data.counts.destinations ?? 0, to: '/admin/destinations' },
         { label: 'Properties', value: data.counts.compounds, to: '/admin/compounds' },
         { label: 'Unit types', value: data.counts.units, to: '/admin/units' },
-        { label: 'Published', value: data.counts.publishedUnits, to: '/admin/units' },
+        { label: 'Live', value: data.counts.publishedUnits, to: '/admin/units' },
+        { label: 'Incomplete (hidden)', value: data.counts.incompleteUnits ?? 0, to: '/admin/units' },
         { label: 'Featured', value: data.counts.featuredUnits, to: '/admin/units' },
         { label: 'Website bookings', value: data.counts.bookings ?? 0, to: '/admin/bookings' },
         { label: 'Slides', value: data.counts.slides, to: '/admin/slideshow' },
@@ -89,7 +93,7 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((c) => (
           <Link key={c.label} to={c.to} className="border border-prime-line bg-prime-surface p-5 transition hover:border-prime-gold">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{c.label}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{c.label}</p>
             <p className="mt-3 font-display text-3xl font-bold tabular-nums">{c.value}</p>
           </Link>
         ))}

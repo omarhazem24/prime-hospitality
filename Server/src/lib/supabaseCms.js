@@ -23,6 +23,7 @@ const {
   faqs,
 } = require('../data/mock');
 const { brandFromName } = require('../data/inventory');
+const { isLive } = require('./unitCompleteness');
 const { COMPOUND_FIELDS, UNIT_FIELDS, applyFields, defaults, syncCoords } = require('./fields');
 const { normalizeSite, mergeSite, sanitizeContentLists } = require('./siteContent');
 
@@ -298,13 +299,14 @@ async function syncUnitsForCompound(compound) {
 
 async function refreshUnitCount(compoundId) {
   if (!compoundId) return;
-  const { count, error } = await getSupabase()
+  const { data, error } = await getSupabase()
     .from('units')
-    .select('id', { count: 'exact', head: true })
+    .select('*')
     .eq('compound_id', compoundId)
     .eq('published', true);
   if (error) throwSb(error);
-  await getSupabase().from('compounds').update({ unit_count: count || 0 }).eq('id', compoundId);
+  const count = (data || []).map(unitFromRow).filter(isLive).length;
+  await getSupabase().from('compounds').update({ unit_count: count }).eq('id', compoundId);
 }
 
 /* ——— Destinations CRUD ——— */

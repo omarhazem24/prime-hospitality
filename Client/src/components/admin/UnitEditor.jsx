@@ -135,7 +135,7 @@ export default function UnitEditor({ open, unit, compounds, compoundGroups, defa
     try {
       const body = payloadFromForm(form);
       const res = unit ? await api.adminUpdateUnit(unit.id, body) : await api.adminCreateUnit(body);
-      onSaved(res.item, res.kwentra);
+      onSaved(res.item, res.kwentra, res.photoWarning);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -196,6 +196,12 @@ export default function UnitEditor({ open, unit, compounds, compoundGroups, defa
     >
       <div className="space-y-6">
         <Section title="Visibility">
+          {unit?.completeness && !unit.completeness.complete ? (
+            <div className="mb-4 border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">
+              <p className="font-semibold">Hidden from guests until every field is filled</p>
+              <p className="mt-1 text-xs">Missing: {unit.completeness.missing.map((m) => m.label).join(', ')}.</p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-6">
             <Toggle checked={form.published} onChange={(published) => set({ published })} label="Published" hint="Bookable and visible in search" />
             <Toggle checked={form.featured} onChange={(featured) => set({ featured })} label="Featured on homepage" hint="Shown in the Featured stays carousel" />
@@ -290,7 +296,7 @@ export default function UnitEditor({ open, unit, compounds, compoundGroups, defa
           </div>
         </Section>
 
-        <Section title="Photos" hint="Share a Google Drive folder as “Anyone with the link”, paste it, then load. The first photo is the card cover.">
+        <Section title="Photos" hint="Required — the unit stays hidden until it has photos. Share a Google Drive folder as “Anyone with the link” and paste it; saving loads the photos automatically, or use Load photos to preview. The first photo is the card cover.">
           <div className="flex flex-wrap gap-2">
             <input
               className="prime-input min-w-[240px] flex-1"
@@ -333,7 +339,7 @@ export default function UnitEditor({ open, unit, compounds, compoundGroups, defa
         </Section>
 
         <Section title="Kwentra link">
-          <Field label="Kwentra room type ID" hint="Links availability, rates and bookings to the PMS. Filled automatically by Import & sync.">
+          <Field label="Kwentra room type ID" hint="Links availability, rates and bookings to the PMS. Filled automatically by Kwentra sync.">
             <input className="prime-input max-w-xs" value={form.kwentraRoomTypeId} placeholder="e.g. 301" onChange={(e) => set({ kwentraRoomTypeId: e.target.value })} />
           </Field>
           <p className={`${labelCls} mt-3 normal-case tracking-normal`}>

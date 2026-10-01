@@ -74,6 +74,22 @@ Prime will store only:
 Env we will set once you confirm the path:
 `KWENTRA_PATH_ROOM_TYPES=...`
 
+### 1b. Webhook on inventory changes (REQUIRED for instant listing)
+
+When a room type, room, property or destination is **created, updated or deleted** in Kwentra, please send:
+
+```
+POST https://<prime-api-domain>/api/webhooks/kwentra
+X-Kwentra-Secret: <shared secret we give you>
+Content-Type: application/json
+
+{ "event": "roomtype.created", "id": 123, "tenant_id": "…" }
+```
+
+Any JSON body works — Prime re-pulls the lists straight away (new units go live on the website within seconds).
+Without the webhook, Prime checks for changes every 5 minutes (`KWENTRA_SYNC_MINUTES`).
+List endpoints should support pagination via `next` links (DRF style) or `page_size`.
+
 ---
 
 ## 2. PULL — Availability (REQUIRED — nice if dedicated)
@@ -162,6 +178,7 @@ Env: `KWENTRA_PATH_PAYMENT=.../:id/payment` (placeholder until you confirm)
 | Base URL (if not `https://manage.kwentra.com`) | ✅ |
 | Docs or Postman for items 1–6 above | ✅ |
 | Whitelist our server IP if required | maybe |
+| Webhook on room type / room / property / destination changes (section 1b) | ✅ |
 | Webhook from Kwentra on cancel/no-show (optional) | nice |
 
 ---
@@ -180,4 +197,4 @@ Env: `KWENTRA_PATH_PAYMENT=.../:id/payment` (placeholder until you confirm)
 
 ## Contact line you can forward to Kwentra
 
-> We are building a headless direct-booking site. We will never use your hosted booking engine. We need Open API access to: (1) list destinations and projects/properties under them, (2) list/update room types, (3) create individual reservations that block availability, (4) post payments to those reservations — in addition to the Reservation GET and Profile GET/PUT docs you already shared. Please send paths, sample requests/responses, and sandbox credentials for tenant_id=…
+> We are building a headless direct-booking site. We will never use your hosted booking engine. We need Open API access to: (1) list destinations and projects/properties under them, (2) list/update room types, (3) create individual reservations that block availability, (4) post payments to those reservations, (5) a webhook to our endpoint whenever a room type, room, property or destination is created/updated/deleted, so new units appear on the website instantly — in addition to the Reservation GET and Profile GET/PUT docs you already shared. Please send paths, sample requests/responses, and sandbox credentials for tenant_id=…

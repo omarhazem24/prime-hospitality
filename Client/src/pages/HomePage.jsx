@@ -69,7 +69,7 @@ function Hero() {
   const next = (index + 1) % images.length;
 
   return (
-    <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-[#221f20] text-white">
+    <section className="relative isolate flex min-h-vh-100 flex-col overflow-hidden bg-[#221f20] text-white">
       <div className="absolute inset-0 -z-10" aria-hidden>
         {images.map((src, i) => {
           // Only the visible slide, the one fading out and the next one are ever in the DOM
@@ -130,7 +130,7 @@ function Hero() {
                     onClick={() => goTo(i)}
                     aria-label={`Show slide ${i + 1}`}
                     aria-current={i === index}
-                    className="group py-3"
+                    className="group px-1.5 py-5"
                   >
                     <span className="relative block h-px w-8 overflow-hidden bg-white/30 sm:w-12">
                       {i === index ? (
@@ -148,7 +148,7 @@ function Hero() {
           ) : (
             <span />
           )}
-          <span className="hidden items-center gap-3 text-[10.5px] font-medium uppercase tracking-[0.3em] text-white/70 md:inline-flex">
+          <span className="hidden items-center gap-3 text-[11px] font-medium uppercase tracking-[0.3em] text-white/70 md:inline-flex">
             {t('home.scroll')}
             <span className="relative block h-8 w-px overflow-hidden bg-white/25">
               <span className="absolute inset-x-0 top-0 h-1/2 animate-[primeScrollCue_2.2s_ease-in-out_infinite] bg-white" />
@@ -194,7 +194,7 @@ function Intro({ destinations }) {
             {stats.map((s) => (
               <div key={s.label} className="px-3 py-8 text-center md:py-10">
                 <p className="font-display text-[2.6rem] font-medium leading-none text-prime-ink md:text-[3.6rem]">{s.value}</p>
-                <p className="mt-3 text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">{s.label}</p>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted">{s.label}</p>
               </div>
             ))}
           </Reveal>

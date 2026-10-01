@@ -302,7 +302,7 @@ export default function BookingModal({
         aria-modal="true"
         aria-labelledby="bm-title"
         tabIndex={-1}
-        className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-prime-surface shadow-premium-lg outline-none animate-[primeModalIn_0.45s_var(--prime-ease)_both] sm:h-[min(54rem,calc(100dvh-3rem))] sm:max-w-[44rem] sm:border sm:border-prime-line lg:max-w-[70rem] lg:flex-row"
+        className="relative flex h-dvh-100 w-full flex-col overflow-hidden bg-prime-surface shadow-premium-lg outline-none animate-[primeModalIn_0.45s_var(--prime-ease)_both] sm:h-dvh-modal sm:max-w-[44rem] sm:border sm:border-prime-line lg:max-w-[70rem] lg:flex-row"
       >
         <SummaryPanel {...summaryProps} className="hidden w-[23rem] shrink-0 lg:flex" />
 
@@ -310,7 +310,7 @@ export default function BookingModal({
           <header className="shrink-0 border-b border-prime-line px-5 pb-4 pt-4 sm:px-8 sm:pt-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-muted">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-muted">
                   {t('bm.eyebrow')}
                 </p>
                 <h2 id="bm-title" className="mt-1 truncate font-display text-lg font-bold tracking-[-0.02em] text-prime-ink">
@@ -339,7 +339,7 @@ export default function BookingModal({
                       disabled={!clickable}
                       onClick={() => goTo(s)}
                       aria-current={current ? 'step' : undefined}
-                      className="group flex min-w-0 items-center gap-2 disabled:cursor-default"
+                      className="group flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-2 disabled:cursor-default sm:min-w-0 sm:shrink sm:justify-start"
                     >
                       <span
                         className={cn(
@@ -354,7 +354,7 @@ export default function BookingModal({
                       </span>
                       <span
                         className={cn(
-                          'hidden truncate text-[10px] font-semibold uppercase tracking-[0.16em] sm:inline',
+                          'hidden truncate text-[11px] font-semibold uppercase tracking-[0.16em] sm:inline',
                           current ? 'text-prime-ink' : 'text-prime-muted'
                         )}
                       >
@@ -434,7 +434,7 @@ export default function BookingModal({
                   {heading}
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border border-prime-gold/40 bg-prime-gold/10 px-4 py-3">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-prime-gold-deep">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-gold-deep">
                         {t('bm.voucher')}
                       </p>
                       <p className="mt-0.5 font-display text-lg font-bold tracking-[0.02em] text-prime-ink">

@@ -54,7 +54,7 @@ function useFloating(open, anchorRef, options) {
 
 const fieldBtn =
   'group flex h-full w-full items-center gap-3 px-5 py-4 text-start transition-colors hover:bg-prime-mist/60 md:px-6 md:py-5';
-const labelCls = 'flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted';
+const labelCls = 'flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted';
 const valueCls = 'mt-1.5 block truncate font-display text-[1.3rem] font-medium leading-none';
 
 export default function HeroSearch() {
@@ -178,7 +178,7 @@ export default function HeroSearch() {
                   >
                     <span className="block min-w-0 truncate text-[15px]">{option.name}</span>
                     {option.brand ? (
-                      <span className="shrink-0 text-[10px] uppercase tracking-[0.16em] text-prime-muted">{option.brand}</span>
+                      <span className="shrink-0 text-[11px] uppercase tracking-[0.16em] text-prime-muted">{option.brand}</span>
                     ) : null}
                   </button>
                 ))}
@@ -196,7 +196,7 @@ export default function HeroSearch() {
     guestOpen && guestStyle
       ? createPortal(
           <div ref={guestMenuRef} style={guestStyle} className={cn(menuShell, 'p-5')}>
-            <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted">{t('home.searchGuests')}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted">{t('home.searchGuests')}</p>
             <div className="mt-4 flex items-center justify-between gap-4">
               <button
                 type="button"

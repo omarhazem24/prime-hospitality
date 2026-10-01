@@ -41,7 +41,7 @@ const NAV_SECTIONS = [
       { to: '/admin/destinations', label: 'Destinations', icon: MapPin },
       { to: '/admin/compounds', label: 'Properties', icon: Building2 },
       { to: '/admin/units', label: 'Unit types', icon: Home },
-      { to: '/admin/sync', label: 'Import & sync', icon: RefreshCw },
+      { to: '/admin/sync', label: 'Kwentra sync', icon: RefreshCw },
     ],
   },
   {
@@ -72,7 +72,7 @@ function NavItems({ collapsed, onNavigate }) {
       {collapsed ? (
         i > 0 ? <div className="mx-3 mb-3 border-t border-prime-line" /> : null
       ) : (
-        <p className="mb-1.5 px-3 text-[9.5px] font-semibold uppercase tracking-[0.24em] text-prime-muted/80">{section.label}</p>
+        <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-prime-muted/80">{section.label}</p>
       )}
       <div className="flex flex-col gap-0.5">
         {section.items.map(({ to, end, label, icon: Icon }) => (
@@ -125,7 +125,7 @@ export default function AdminLayout() {
         <span className="font-display text-xl font-bold">P</span>
       ) : (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-muted">Prime Hospitality</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-muted">Prime Hospitality</p>
           <p className="mt-0.5 font-display text-lg font-bold tracking-[-0.02em]">Admin</p>
         </div>
       )}
@@ -202,7 +202,7 @@ export default function AdminLayout() {
               >
                 {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
               </button>
-              <span className="border border-prime-gold/40 bg-prime-gold/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-gold-deep">
+              <span className="border border-prime-gold/40 bg-prime-gold/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-gold-deep">
                 Website admin · PMS is Kwentra
               </span>
             </div>

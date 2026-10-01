@@ -7,13 +7,13 @@ import { cn } from '../../utils/cn';
 import { countryName, countryOptions } from '../../utils/countries';
 import { formatIsoDate, formatTime } from './bookingUtils';
 
-const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-prime-muted';
+const labelCls = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-muted';
 
 export function StepHeading({ index, total, title, lede }) {
   const { t } = useLocale();
   return (
     <div className="mb-6">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-gold-deep">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-gold-deep">
         {t('bm.stepOf', { n: index + 1, total })}
       </p>
       <h3 className="mt-1.5 font-display text-2xl font-bold tracking-[-0.02em] text-prime-ink" tabIndex={-1} data-step-heading>
@@ -123,7 +123,7 @@ export function StayStep({ stay, setStay, errors, listing, config, blockedDates,
 
   const dateCell = (label, iso, error) => (
     <div className={cn('px-4 py-3', error && 'bg-red-50 dark:bg-red-950/30')}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{label}</p>
       <p className={cn('mt-1 text-sm font-semibold', iso ? 'text-prime-ink' : 'text-prime-muted')}>
         {iso ? formatIsoDate(iso, localeTag, { weekday: 'short', month: 'short', day: 'numeric' }) : t('common.addDate')}
       </p>
@@ -152,10 +152,10 @@ export function StayStep({ stay, setStay, errors, listing, config, blockedDates,
         {dateCell(t('bm.arrival'), stay.arrivalDate, errors.arrivalDate)}
         {dateCell(t('bm.departure'), stay.departureDate, errors.departureDate)}
         <div className="bg-prime-mist/60 px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{t('bm.nights')}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">{t('bm.nights')}</p>
           <p className="mt-1 text-sm font-semibold text-prime-ink">
             {stay.nights || '—'}
-            <span className="ms-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-prime-muted">{t('bm.auto')}</span>
+            <span className="ms-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-prime-muted">{t('bm.auto')}</span>
           </p>
         </div>
       </div>
@@ -312,14 +312,14 @@ export function RateStep({ quotes, selected, onSelect, error, currency, loading,
                 <span className="mt-3 flex flex-wrap items-center gap-2">
                   <span
                     className={cn(
-                      'border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em]',
+                      'border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]',
                       plan.refundable ? 'border-emerald-600/30 text-emerald-700 dark:text-emerald-400' : 'border-prime-line text-prime-muted'
                     )}
                   >
                     {plan.refundable ? t('bm.refundable') : t('bm.nonRefundable')}
                   </span>
                   {plan.adjustmentPct < 0 && (
-                    <span className="bg-prime-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-prime-gold-deep">
+                    <span className="bg-prime-gold/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-prime-gold-deep">
                       {t('bm.savePct', { pct: Math.abs(plan.adjustmentPct) })}
                     </span>
                   )}
@@ -444,7 +444,7 @@ export function GuestStep({ guest, setGuest, stay, errors, autoCountry, heading 
 
         {extra > 0 && (
           <fieldset className="border border-prime-line p-4 sm:p-5">
-            <legend className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-prime-muted">
+            <legend className="px-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-muted">
               {t('bm.otherGuests')}
               <Tag>{t('bm.optional')}</Tag>
             </legend>
@@ -504,7 +504,7 @@ function ReviewGroup({ title, onEdit, rows }) {
   return (
     <div className="border border-prime-line">
       <div className="flex items-center justify-between border-b border-prime-line bg-prime-mist/50 px-4 py-2.5">
-        <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-prime-ink">{title}</h4>
+        <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-ink">{title}</h4>
         {onEdit && (
           <button
             type="button"

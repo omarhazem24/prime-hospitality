@@ -155,7 +155,7 @@ function PropertyEditor({ open, property, destinations, unitCount, defaults, onC
           <Field label="City / area">
             <input className="prime-input" value={form.city || ''} onChange={(e) => set({ city: e.target.value })} />
           </Field>
-          <Field label="Kwentra project ID" hint="Filled automatically by Import & sync.">
+          <Field label="Kwentra project ID" hint="Filled automatically by Kwentra sync.">
             <input className="prime-input" value={form.kwentraProjectId || ''} placeholder="optional" onChange={(e) => set({ kwentraProjectId: e.target.value })} />
           </Field>
           <ImageUploadField
@@ -326,7 +326,7 @@ export default function AdminCompoundsPage() {
       ) : filtered.length ? (
         <div className="overflow-x-auto border border-prime-line bg-prime-surface">
           <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
+            <thead className="border-b border-prime-line text-[11px] uppercase tracking-[0.16em] text-prime-muted">
               <tr>
                 <th className="px-3 py-3">Order</th>
                 <th className="px-3 py-3">Property</th>

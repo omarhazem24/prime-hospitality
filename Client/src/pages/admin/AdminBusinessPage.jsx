@@ -86,7 +86,7 @@ export default function AdminBusinessPage() {
                 ['Address', brand.address],
               ].map(([k, v]) => (
                 <div key={k}>
-                  <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-prime-muted">{k}</dt>
+                  <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted">{k}</dt>
                   <dd className="mt-0.5 break-words">{v}</dd>
                 </div>
               ))}

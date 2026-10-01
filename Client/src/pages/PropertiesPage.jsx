@@ -28,7 +28,7 @@ function PropertyCard({ property, destination, lead }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
         {property.brand ? (
-          <span className="absolute start-4 top-4 bg-white/90 px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-[0.2em] text-[#221f20] backdrop-blur-sm">
+          <span className="absolute start-4 top-4 bg-white/90 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20] backdrop-blur-sm">
             Prime {property.brand}
           </span>
         ) : null}
@@ -38,7 +38,7 @@ function PropertyCard({ property, destination, lead }) {
       </div>
       <div className="flex items-end justify-between gap-4 pt-5">
         <div className="min-w-0">
-          <p className="truncate text-[10.5px] font-medium uppercase tracking-[0.24em] text-prime-muted">
+          <p className="truncate text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">
             {[property.city || destination.name, t('home.unitTypesCount', { count: property.unitCount || 0 })]
               .filter(Boolean)
               .join(' · ')}
@@ -188,7 +188,7 @@ export default function PropertiesPage() {
                 <div key={label}>
                   <dt className="sr-only">{label}</dt>
                   <dd className="font-display text-[2.4rem] font-medium leading-none tabular-nums">{value}</dd>
-                  <p className="mt-2 text-[10.5px] font-medium uppercase tracking-[0.26em] text-white/70">{label}</p>
+                  <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.26em] text-white/70">{label}</p>
                 </div>
               ))}
             </dl>
@@ -213,7 +213,7 @@ export default function PropertiesPage() {
               ))}
             </div>
             {brands.length > 1 ? (
-              <div className="flex shrink-0 items-center gap-1 text-[11px] font-medium uppercase tracking-[0.2em]" role="group" aria-label="Brand">
+              <div className="flex max-w-full flex-wrap items-center gap-1 text-[11px] font-medium uppercase tracking-[0.2em]" role="group" aria-label="Brand">
                 {['', ...brands].map((b) => (
                   <button
                     key={b || 'all'}
@@ -221,7 +221,7 @@ export default function PropertiesPage() {
                     onClick={() => patch('brand', b)}
                     aria-pressed={activeBrand === b}
                     className={cn(
-                      'relative px-3 py-2 transition',
+                      'relative min-h-[44px] px-3 py-2 transition',
                       activeBrand === b ? 'text-prime-ink' : 'text-prime-muted hover:text-prime-ink'
                     )}
                   >

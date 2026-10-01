@@ -56,7 +56,7 @@ export function ImageUploadField({
   return (
     <div className={cn(className)}>
       {label ? (
-        <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
+        <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
           {label}
         </label>
       ) : null}

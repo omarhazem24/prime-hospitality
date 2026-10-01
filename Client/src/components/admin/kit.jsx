@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, CheckCircle2, Search, X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
-export const labelCls = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted';
+export const labelCls = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted';
 
 /* ——— Toasts ——— */
 const ToastContext = createContext({ success: () => {}, error: () => {} });
@@ -128,7 +128,7 @@ const BADGE_TONES = {
 
 export function Badge({ tone = 'gray', children, className }) {
   return (
-    <span className={cn('inline-flex items-center whitespace-nowrap border px-2 py-0.5 text-[10.5px] font-semibold', BADGE_TONES[tone], className)}>
+    <span className={cn('inline-flex items-center whitespace-nowrap border px-2 py-0.5 text-[11px] font-semibold', BADGE_TONES[tone], className)}>
       {children}
     </span>
   );
@@ -238,7 +238,7 @@ export function BilingualField({ label, hint, value = {}, onChange, multiline = 
           ['ar', 'AR', 'rtl'],
         ].map(([locale, tag, dir]) => (
           <div key={locale} className="relative">
-            <span className="pointer-events-none absolute end-2 top-2 text-[9px] font-bold tracking-wider text-prime-muted">{tag}</span>
+            <span className="pointer-events-none absolute end-2 top-2 text-[11px] font-bold tracking-wider text-prime-muted">{tag}</span>
             <Input
               dir={dir}
               rows={multiline ? rows : undefined}

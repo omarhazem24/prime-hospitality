@@ -46,6 +46,20 @@ export default {
       maxWidth: {
         prime: '1360px',
       },
+      // Viewport heights divided by the large-screen zoom (see index.css)
+      minHeight: {
+        screen: 'calc(100vh / var(--ui-zoom, 1))',
+        'vh-100': 'calc(100svh / var(--ui-zoom, 1))',
+        'vh-72': 'calc(72svh / var(--ui-zoom, 1))',
+        'vh-78': 'calc(78svh / var(--ui-zoom, 1))',
+      },
+      height: {
+        'dvh-100': 'calc(100dvh / var(--ui-zoom, 1))',
+        'dvh-modal': 'min(54rem, calc(100dvh / var(--ui-zoom, 1) - 3rem))',
+      },
+      maxHeight: {
+        'dvh-90': 'calc(90dvh / var(--ui-zoom, 1))',
+      },
       letterSpacing: {
         brand: '0.32em',
         premium: '0.2em',

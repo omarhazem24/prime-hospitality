@@ -23,7 +23,7 @@ router.post(
     }
 
     const listing = await findUnit(slug);
-    if (!listing || listing.published === false) {
+    if (!listing?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
 

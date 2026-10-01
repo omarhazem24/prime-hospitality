@@ -34,7 +34,7 @@ function Dropdown({
         )}
       >
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-prime-muted">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">
             {Icon ? <Icon size={12} strokeWidth={1.6} className="text-prime-gold-deep" aria-hidden /> : null}
             {label}
             <ChevronDown size={12} className={cn('opacity-60 transition', open && 'rotate-180')} />
@@ -78,7 +78,7 @@ function MenuItem({ active, onClick, title, subtitle }) {
 
 function MenuGroup({ title }) {
   return (
-    <p className="px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.22em] text-prime-gold-deep first:pt-1.5">
+    <p className="px-3 pb-1 pt-3 text-[11px] font-medium uppercase tracking-[0.22em] text-prime-gold-deep first:pt-1.5">
       {title}
     </p>
   );
@@ -188,7 +188,7 @@ export default function StaysFiltersBar({ filters, destinations, unitTypes, bran
           </Dropdown>
 
           <div className="min-w-0 px-3 py-2.5 sm:px-4">
-            <p className="mb-1.5 px-1 text-[10px] font-medium uppercase tracking-[0.24em] text-prime-muted">Dates</p>
+            <p className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">Dates</p>
             <DateRangePicker
               checkin={filters.checkIn || ''}
               checkout={filters.checkOut || ''}

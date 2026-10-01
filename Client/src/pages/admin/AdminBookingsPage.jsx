@@ -87,7 +87,7 @@ export default function AdminBookingsPage() {
 
       <div className="overflow-x-auto border border-prime-line bg-prime-surface">
         <table className="w-full min-w-[960px] text-left text-sm">
-          <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
+          <thead className="border-b border-prime-line text-[11px] uppercase tracking-[0.16em] text-prime-muted">
             <tr>
               <th className="px-3 py-3">Voucher</th>
               <th className="px-3 py-3">Primary guest</th>
@@ -132,7 +132,7 @@ export default function AdminBookingsPage() {
                     <td className="px-3 py-3">
                       <span
                         className={cn(
-                          'border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                          'border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]',
                           STATUS_STYLES[b.paymentStatus] || 'border-prime-line text-prime-muted'
                         )}
                       >
@@ -146,7 +146,7 @@ export default function AdminBookingsPage() {
                   {expanded && (
                     <tr className="border-b border-prime-line bg-prime-sand">
                       <td colSpan={9} className="px-5 py-4">
-                        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
+                        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
                           PMS data fields
                         </p>
                         <dl className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">

@@ -2,7 +2,7 @@ import { brand } from '../theme/brand';
 
 export default function RouteFallback() {
   return (
-    <div className="flex min-h-[100svh] items-center justify-center bg-prime-sand" role="status" aria-label="Loading">
+    <div className="flex min-h-vh-100 items-center justify-center bg-prime-sand" role="status" aria-label="Loading">
       <img
         src={brand.logoDark}
         alt=""

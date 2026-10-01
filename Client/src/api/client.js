@@ -259,16 +259,6 @@ export const api = {
   adminKwentraSync() {
     return adminRequest('/api/admin/kwentra/sync', { method: 'POST' });
   },
-  adminImportInventory(file, { apply = false, destinationId = '' } = {}) {
-    const fd = new FormData();
-    fd.append('file', file);
-    return adminRequest('/api/admin/import/inventory', {
-      method: 'POST',
-      formData: fd,
-      params: { apply: apply ? '1' : '0', destinationId },
-    });
-  },
-
   adminGetSettings() {
     return adminRequest('/api/admin/settings');
   },

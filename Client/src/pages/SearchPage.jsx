@@ -211,7 +211,7 @@ export default function SearchPage() {
       <Header />
       <main>
         <section className="prime-container pb-8 pt-8 md:pb-12 md:pt-14">
-          <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-[10.5px] font-medium uppercase tracking-[0.24em] text-prime-muted">
+          <nav aria-label="Breadcrumb" className="mb-6 flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">
             <Link to="/" className="transition hover:text-prime-ink">Home</Link>
             <span aria-hidden>/</span>
             {destination || property ? (
@@ -353,7 +353,7 @@ export default function SearchPage() {
 
           <div
             className={cn(
-              'grid',
+              'grid grid-cols-1',
               view === 'list' ? 'gap-y-10 md:gap-y-12' : 'gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-8'
             )}
           >

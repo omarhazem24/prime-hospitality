@@ -68,7 +68,7 @@ function ItemEditor({ kind, item, onChange }) {
         <input type="url" className="prime-input" value={item.logo || ''} onChange={(e) => onChange({ ...item, logo: e.target.value })} />
       </Field>
       <div className="grid h-11 w-24 place-items-center border border-prime-line bg-white">
-        {item.logo ? <img src={item.logo} alt="" className="max-h-8 max-w-[80px] object-contain" /> : <span className="text-[10px] text-prime-muted">No logo</span>}
+        {item.logo ? <img src={item.logo} alt="" className="max-h-8 max-w-[80px] object-contain" /> : <span className="text-[11px] text-prime-muted">No logo</span>}
       </div>
     </div>
   );

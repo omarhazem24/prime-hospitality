@@ -129,16 +129,16 @@ export function ListingRow({ listing, priority = false }) {
   const specs = specsOf(listing);
   const amenities = (listing.amenities || []).slice(0, 4);
   return (
-    <article className="group grid gap-6 border-t border-prime-line pt-8 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:gap-10 lg:gap-14">
+    <article className="group grid min-w-0 grid-cols-1 gap-6 border-t border-prime-line pt-8 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:gap-10 lg:gap-14">
       <div className="relative aspect-[4/3] overflow-hidden bg-prime-mist">
         <CardMedia listing={listing} href={href} priority={priority} sizes="(min-width: 768px) 42vw, 100vw" />
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4">
           <span className="flex flex-wrap gap-1.5">
             {listing.featured ? (
-              <span className="bg-prime-gold px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-[0.2em] text-[#221f20]">Featured</span>
+              <span className="bg-prime-gold px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20]">Featured</span>
             ) : null}
             {listing.brand ? (
-              <span className="bg-white/90 px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-[0.2em] text-[#221f20]">
+              <span className="bg-white/90 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20]">
                 Prime {listing.brand}
               </span>
             ) : null}
@@ -149,7 +149,7 @@ export function ListingRow({ listing, priority = false }) {
 
       <div className="flex min-w-0 flex-col md:py-2">
         <div className="flex items-start justify-between gap-4">
-          <p className="min-w-0 truncate text-[10.5px] font-medium uppercase tracking-[0.24em] text-prime-muted">{metaOf(listing)}</p>
+          <p className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">{metaOf(listing)}</p>
           <Rating listing={listing} />
         </div>
         <h3 className="mt-3 font-display text-[2rem] font-medium leading-[1.1] text-prime-ink text-balance md:text-[2.4rem]">
@@ -194,19 +194,19 @@ export default function ListingCard({ listing, priority = false, featured = fals
   const specs = specsOf(listing);
 
   return (
-    <article className={cn('group relative flex flex-col', className)}>
+    <article className={cn('group relative flex min-w-0 flex-col', className)}>
       <div className={cn('relative overflow-hidden bg-prime-mist', featured ? 'aspect-[4/5] lg:aspect-[5/6]' : 'aspect-[4/5]')}>
         <CardMedia listing={listing} href={href} sizes={sizes} priority={priority} />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-4">
           <span className="flex flex-wrap gap-1.5">
             {featured ? (
-              <span className="bg-prime-gold px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-[0.2em] text-[#221f20]">
+              <span className="bg-prime-gold px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20]">
                 Featured
               </span>
             ) : null}
             {listing.brand ? (
-              <span className="bg-white/90 px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-[0.2em] text-[#221f20] backdrop-blur-sm">
+              <span className="bg-white/90 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[#221f20] backdrop-blur-sm">
                 Prime {listing.brand}
               </span>
             ) : null}
@@ -217,7 +217,7 @@ export default function ListingCard({ listing, priority = false, featured = fals
 
       <div className="flex flex-1 flex-col pt-5">
         <div className="flex items-start justify-between gap-3">
-          <p className="min-w-0 truncate text-[10.5px] font-medium uppercase tracking-[0.24em] text-prime-muted">{metaOf(listing)}</p>
+          <p className="min-w-0 truncate text-[11px] font-medium uppercase tracking-[0.24em] text-prime-muted">{metaOf(listing)}</p>
           <Rating listing={listing} />
         </div>
         <h3
@@ -226,7 +226,7 @@ export default function ListingCard({ listing, priority = false, featured = fals
             featured ? 'text-[1.9rem] md:text-[2.3rem]' : 'text-[1.55rem]'
           )}
         >
-          <Link to={href} className="bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1px] bg-left-bottom bg-no-repeat transition-[background-size] duration-500 ease-prime group-hover:bg-[length:100%_1px]">
+          <Link to={href} className="prime-tap bg-[linear-gradient(currentColor,currentColor)] bg-[length:0%_1px] bg-left-bottom bg-no-repeat transition-[background-size] duration-500 ease-prime group-hover:bg-[length:100%_1px]">
             {listing.title}
           </Link>
         </h3>

@@ -38,7 +38,7 @@ function Spec({ num, unit, label }) {
         {num}
         {unit ? <span className="ms-1 font-sans text-sm font-light text-prime-muted">{unit}</span> : null}
       </div>
-      <div className="mt-2.5 text-[10px] font-medium uppercase tracking-[0.2em] text-prime-muted sm:tracking-[0.24em]">{label}</div>
+      <div className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.2em] text-prime-muted sm:tracking-[0.24em]">{label}</div>
     </div>
   );
 }
@@ -552,7 +552,7 @@ export default function ListingDetailPage() {
                 </h2>
                 {!!amenities.length && (
                   <div className="mt-6">
-                    <h3 className="mb-4 text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">
+                    <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted">
                       {t('listing.amenitiesHeading')}
                     </h3>
                     <div className="mb-9 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -565,7 +565,7 @@ export default function ListingDetailPage() {
 
                 {!!facilities.length && (
                   <div>
-                    <h3 className="mb-4 text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">
+                    <h3 className="mb-4 text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted">
                       {facilitiesHeading}
                     </h3>
                     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -658,7 +658,7 @@ export default function ListingDetailPage() {
             </div>
 
             <aside className="hidden h-fit bg-prime-surface p-8 shadow-premium lg:sticky lg:top-[calc(var(--prime-header-h)+5rem)] lg:block">
-              <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-prime-muted">{t('listing.reservation')}</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-prime-muted">{t('listing.reservation')}</p>
               {hasPrice ? (
                 <>
                   <p className="mt-4 font-display text-[2.6rem] font-medium leading-none tabular-nums text-prime-ink">
@@ -712,7 +712,7 @@ export default function ListingDetailPage() {
           <div className="min-w-0 flex-1">
             {hasPrice ? (
               <>
-                <p className="text-[10px] font-medium uppercase tracking-[0.22em] text-prime-muted">From</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-prime-muted">From</p>
                 <p className="truncate font-display text-[1.5rem] font-medium leading-tight tabular-nums text-prime-ink">
                   {formatMoney(displayFromPrice, listing.currency)}
                   <span className="ms-1 font-sans text-[12px] font-light text-prime-muted">/ night</span>

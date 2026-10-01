@@ -54,7 +54,7 @@ async function getAvailability(req, res, next) {
     const listing = await findUnit(unitKey);
     const { from, to } = resolveWindow(req.query);
 
-    if (!listing || listing.published === false) {
+    if (!listing?.live) {
       // Still allow availability by room type id alone
       if (kwentra.isConfigured() && req.query.roomTypeId) {
         const avail = await kwentra.getAvailability(req.query.roomTypeId, { from, to });
@@ -143,7 +143,7 @@ async function getQuote(req, res, next) {
     const arrivalDate = req.body?.arrivalDate || req.body?.checkIn;
     const departureDate = req.body?.departureDate || req.body?.checkOut;
     const listing = await findUnit(slug || unitId);
-    if (!listing || listing.published === false) {
+    if (!listing?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
     const nights = pms.nightsBetween(arrivalDate, departureDate);
@@ -214,7 +214,7 @@ async function bookDirect(req, res, next) {
     if (!slug && !unitId) return res.status(400).json({ error: 'slug or unitId is required' });
 
     const listing = await findUnit(slug || unitId);
-    if (!listing || listing.published === false) {
+    if (!listing?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
 

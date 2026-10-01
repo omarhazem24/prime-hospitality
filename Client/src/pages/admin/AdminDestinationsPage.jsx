@@ -81,7 +81,7 @@ function DestinationEditor({ open, destination, onClose, onSaved, onDelete, stat
           <textarea className="prime-input min-h-[90px]" value={form.description || ''} onChange={(e) => set({ description: e.target.value })} />
         </Field>
         <ImageUploadField label="Cover photo" value={form.image} folder="destinations" ratio="4:3" size="1200×900" onChange={(image) => set({ image })} />
-        <Field label="Kwentra destination ID" hint="Filled automatically by Import & sync.">
+        <Field label="Kwentra destination ID" hint="Filled automatically by Kwentra sync.">
           <input className="prime-input max-w-xs" value={form.kwentraDestinationId || ''} onChange={(e) => set({ kwentraDestinationId: e.target.value })} />
         </Field>
       </div>
@@ -176,7 +176,7 @@ export default function AdminDestinationsPage() {
       ) : items.length ? (
         <div className="overflow-x-auto border border-prime-line bg-prime-surface">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
+            <thead className="border-b border-prime-line text-[11px] uppercase tracking-[0.16em] text-prime-muted">
               <tr>
                 <th className="px-3 py-3">Order</th>
                 <th className="px-3 py-3">Destination</th>

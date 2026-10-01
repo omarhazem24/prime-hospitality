@@ -17,7 +17,8 @@ export default function PlaceCapsules({
   className,
 }) {
   return (
-    <div className={cn('flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
+    <div className={cn('flex items-center gap-2', className)}>
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] [scrollbar-width:none] rtl:[mask-image:linear-gradient(to_left,#000_calc(100%-2rem),transparent)] [&::-webkit-scrollbar]:hidden">
       {onBack ? (
         <button
           type="button"
@@ -44,7 +45,7 @@ export default function PlaceCapsules({
 
       <span className="mx-1 h-5 w-px shrink-0 bg-prime-line" aria-hidden />
 
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 pe-8">
         {places.map((place) => {
           const active = selectedId === place.id;
           return (
@@ -70,11 +71,12 @@ export default function PlaceCapsules({
         })}
         {!places.length ? <span className="shrink-0 text-sm text-prime-muted">{emptyLabel}</span> : null}
       </div>
+      </div>
 
       <button
         type="button"
         onClick={onOpenFilters}
-        className="ms-auto flex shrink-0 items-center gap-2 rounded-full border border-prime-line bg-prime-surface px-4 py-2 text-sm font-medium text-prime-ink transition hover:border-prime-ink/40 md:hidden"
+        className="mb-1 flex shrink-0 items-center gap-2 rounded-full border border-prime-line bg-prime-surface px-4 py-2 text-sm font-medium text-prime-ink transition hover:border-prime-ink/40 md:hidden"
       >
         <SlidersHorizontal size={14} strokeWidth={1.8} />
         Filters

@@ -178,7 +178,7 @@ export default function ListingDatePicker({
         inline
           ? 'bg-transparent'
           : isMobile
-            ? 'fixed inset-x-0 bottom-0 z-[260] max-h-[90dvh] overflow-y-auto rounded-t-[1.25rem] border-t border-prime-line bg-prime-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl'
+            ? 'fixed inset-x-0 bottom-0 z-[260] max-h-dvh-90 overflow-y-auto rounded-t-[1.25rem] border-t border-prime-line bg-prime-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl'
             : 'fixed z-[260] border border-prime-line bg-prime-surface p-6 shadow-[0_24px_64px_rgba(34,31,32,0.14)]'
       )}
       style={
@@ -197,7 +197,7 @@ export default function ListingDatePicker({
           <ChevronLeft size={18} strokeWidth={1.75} />
         </button>
         <div className="min-w-0 text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-muted">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-muted">
             {t('listing.selectDates')}
           </p>
           <h3
@@ -268,7 +268,7 @@ export default function ListingDatePicker({
         <p className="text-[13px] font-medium text-prime-ink/80">{summary()}</p>
         <button
           type="button"
-          className="text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted underline-offset-4 transition hover:text-prime-ink hover:underline"
+          className="-my-3 px-2 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted underline-offset-4 transition hover:text-prime-ink hover:underline"
           onClick={() => onChange({ start: null, end: null })}
         >
           {t('common.clear')}
@@ -412,7 +412,7 @@ function Month({
         {price !== undefined ? (
           <span
             className={cn(
-              'text-[9.5px] font-medium leading-none tracking-wide tabular-nums',
+              'text-[11px] font-medium leading-none tracking-wide tabular-nums',
               isStart || isEnd ? 'text-prime-sand/75' : between ? 'text-prime-gold-deep' : 'text-prime-muted'
             )}
           >
@@ -441,7 +441,7 @@ function Month({
         {WEEKDAYS.map((day, i) => (
           <span
             key={`${day}-${i}`}
-            className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-prime-muted"
+            className="py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-prime-muted"
           >
             {day}
           </span>

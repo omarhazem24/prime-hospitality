@@ -174,8 +174,8 @@ export default function DateRangePicker({
     ? 'grid h-full grid-cols-2'
     : 'grid grid-cols-2 overflow-hidden border border-prime-line bg-prime-surface';
   const labelCls = isHero
-    ? 'block text-[10px] font-medium uppercase tracking-[0.26em] text-prime-muted'
-    : 'block text-[10px] font-medium uppercase tracking-[0.2em] text-prime-muted';
+    ? 'block text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted'
+    : 'block text-[11px] font-medium uppercase tracking-[0.2em] text-prime-muted';
   const valueCls = (filled) =>
     isHero
       ? `mt-1.5 block truncate font-display text-[1.3rem] font-medium leading-none ${filled ? 'text-prime-ink' : 'text-prime-muted/80'}`
@@ -249,7 +249,7 @@ export default function DateRangePicker({
           {WEEKDAYS.map((weekday) => (
             <span
               key={weekday}
-              className="text-[10px] font-semibold tracking-[0.14em] text-prime-muted/70"
+              className="text-[11px] font-semibold tracking-[0.14em] text-prime-muted/70"
             >
               {weekday}
             </span>
@@ -339,7 +339,7 @@ export default function DateRangePicker({
 export function DateRangeFieldLabel() {
   const { t } = useLocale();
   return (
-    <span className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-prime-muted">
+    <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-prime-muted">
       <CalendarDays size={13} strokeWidth={2} />
       {t('common.dates')}
     </span>

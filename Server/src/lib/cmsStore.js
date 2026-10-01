@@ -4,9 +4,31 @@
 const { isSupabaseConfigured } = require('../config/supabase');
 const json = require('./jsonCms');
 const sb = require('./supabaseCms');
+const { withCompleteness, isLive } = require('./unitCompleteness');
 
 function backend() {
   return isSupabaseConfigured() ? sb : json;
+}
+
+const decorate = (unit) => withCompleteness(unit);
+const decorateAll = (units) => (Array.isArray(units) ? units.map(withCompleteness) : units);
+
+/** Guests only ever see units that are published and pass the completeness check */
+async function getPublicUnits(opts = {}) {
+  const units = await backend().getPublicUnits(opts);
+  const list = opts.publishedOnly === false ? units : units.filter(isLive);
+  return decorateAll(list);
+}
+
+async function getDashboard(...args) {
+  const [dashboard, units] = await Promise.all([backend().getDashboard(...args), backend().listUnits()]);
+  const checked = decorateAll(units);
+  dashboard.counts = {
+    ...dashboard.counts,
+    publishedUnits: checked.filter((u) => u.live).length,
+    incompleteUnits: checked.filter((u) => !u.completeness.complete).length,
+  };
+  return dashboard;
 }
 
 function usingSupabase() {
@@ -25,6 +47,7 @@ async function ensureReady() {
     return;
   }
   json.ensureStore();
+  json.recountUnits();
   console.warn(
     '[prime] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — using local JSON store. Configure Supabase for production.'
   );
@@ -36,8 +59,8 @@ module.exports = {
   sortBy: (...args) => backend().sortBy(...args),
   slugify: (...args) => backend().slugify(...args),
   newId: (...args) => backend().newId(...args),
-  getDashboard: (...args) => backend().getDashboard(...args),
-  getPublicUnits: (...args) => backend().getPublicUnits(...args),
+  getDashboard,
+  getPublicUnits,
   getPublicCompounds: (...args) => backend().getPublicCompounds(...args),
   getPublicDestinations: (...args) => backend().getPublicDestinations(...args),
   getSlideshow: (...args) => backend().getSlideshow(...args),
@@ -46,7 +69,7 @@ module.exports = {
   saveContent: (...args) => backend().saveContent(...args),
   getSite: (...args) => backend().getSite(...args),
   saveSite: (...args) => backend().saveSite(...args),
-  findUnit: (...args) => backend().findUnit(...args),
+  findUnit: async (...args) => decorate(await backend().findUnit(...args)),
   findCompound: (...args) => backend().findCompound(...args),
   findDestination: (...args) => backend().findDestination(...args),
   listDestinations: (...args) => backend().listDestinations(...args),
@@ -55,7 +78,7 @@ module.exports = {
   deleteDestination: (...args) => backend().deleteDestination(...args),
   reorderDestinations: (...args) => backend().reorderDestinations(...args),
   listCompounds: (...args) => backend().listCompounds(...args),
-  listUnits: (...args) => backend().listUnits(...args),
+  listUnits: async (...args) => decorateAll(await backend().listUnits(...args)),
   listSlides: (...args) => backend().listSlides(...args),
   createSlide: (...args) => backend().createSlide(...args),
   updateSlide: (...args) => backend().updateSlide(...args),
@@ -65,11 +88,11 @@ module.exports = {
   updateCompound: (...args) => backend().updateCompound(...args),
   deleteCompound: (...args) => backend().deleteCompound(...args),
   reorderCompounds: (...args) => backend().reorderCompounds(...args),
-  createUnit: (...args) => backend().createUnit(...args),
-  updateUnit: (...args) => backend().updateUnit(...args),
-  deleteUnit: (...args) => backend().deleteUnit(...args),
-  reorderHomeUnits: (...args) => backend().reorderHomeUnits(...args),
-  reorderSearchUnits: (...args) => backend().reorderSearchUnits(...args),
+  createUnit: async (...args) => decorate(await backend().createUnit(...args)),
+  updateUnit: async (...args) => decorate(await backend().updateUnit(...args)),
+  deleteUnit: async (...args) => decorateAll(await backend().deleteUnit(...args)),
+  reorderHomeUnits: async (...args) => decorateAll(await backend().reorderHomeUnits(...args)),
+  reorderSearchUnits: async (...args) => decorateAll(await backend().reorderSearchUnits(...args)),
   saveSettings: (...args) => backend().saveSettings(...args),
   nextVoucherSerial: (...args) => backend().nextVoucherSerial(...args),
   createBooking: (...args) => backend().createBooking(...args),

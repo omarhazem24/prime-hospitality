@@ -8,7 +8,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 
 /** Room numbers, Drive links and sync bookkeeping are for staff only */
 function publicUnit(unit) {
-  const { unitNumbers: _n, kwentraSnapshot: _s, driveFolderUrl: _d, ...rest } = unit;
+  const { unitNumbers: _n, kwentraSnapshot: _s, driveFolderUrl: _d, completeness: _c, live: _l, ...rest } = unit;
   return rest;
 }
 
@@ -80,7 +80,7 @@ router.get(
   '/:slug/availability',
   wrap(async (req, res) => {
     const item = await findUnit(req.params.slug);
-    if (!item || item.published === false) {
+    if (!item?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
     const { from, to } = resolveWindow(req.query);
@@ -100,7 +100,7 @@ router.get(
   '/:slug/pricing',
   wrap(async (req, res) => {
     const item = await findUnit(req.params.slug);
-    if (!item || item.published === false) {
+    if (!item?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
     const { from, to } = resolveWindow(req.query);
@@ -121,7 +121,7 @@ router.get(
   '/:slug',
   wrap(async (req, res) => {
     const item = await findUnit(req.params.slug);
-    if (!item || item.published === false) {
+    if (!item?.live) {
       return res.status(404).json({ error: 'Listing not found' });
     }
     const compound = item.compoundId ? await findCompound(item.compoundId) : null;

@@ -5,8 +5,8 @@ export default function AdminSyncPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Import & sync"
-        lede="Kwentra is the source of truth for inventory details. Pull the latest from Kwentra, or import a property fact sheet (.xlsx). Photos, visibility and ordering stay website-only."
+        title="Kwentra sync"
+        lede="Kwentra is the source of truth for inventory details — add a unit in Kwentra and it appears here automatically. Photos, visibility and ordering stay website-only."
       />
       <InventorySyncPanel />
     </div>

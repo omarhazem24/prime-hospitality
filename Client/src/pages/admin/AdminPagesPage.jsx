@@ -70,7 +70,7 @@ function TextEditor({ copy, onChange }) {
             )}
           >
             <span className="truncate">{g.label}</span>
-            <span className="shrink-0 text-[10px] tabular-nums opacity-70">
+            <span className="shrink-0 text-[11px] tabular-nums opacity-70">
               {g.edited ? `${g.edited}/` : ''}
               {g.keys.length}
             </span>

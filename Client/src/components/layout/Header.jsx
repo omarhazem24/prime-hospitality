@@ -24,19 +24,18 @@ const MENU_IMAGE =
 
 function ThemeToggle() {
   const { isDark, toggleTheme } = useTheme();
+  const iconCls = 'absolute inset-0 m-auto transition-all duration-500 ease-prime';
   return (
     <button
       type="button"
-      role="switch"
-      aria-checked={isDark}
+      aria-pressed={isDark}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Light mode' : 'Dark mode'}
       onClick={toggleTheme}
-      data-on={isDark ? 'true' : 'false'}
-      className="prime-theme-toggle border-white/25 bg-white/10"
+      className="prime-tap relative inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center opacity-85 transition-opacity hover:opacity-100"
     >
-      <span className="prime-theme-toggle__thumb">
-        {isDark ? <Moon size={11} strokeWidth={2.25} /> : <Sun size={11} strokeWidth={2.25} />}
-      </span>
+      <Sun size={18} strokeWidth={1.5} className={cn(iconCls, isDark ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-50 opacity-0')} />
+      <Moon size={17} strokeWidth={1.5} className={cn(iconCls, isDark ? 'rotate-90 scale-50 opacity-0' : 'rotate-0 scale-100 opacity-100')} />
     </button>
   );
 }
@@ -180,7 +179,7 @@ export default function Header({ overHero = false }) {
               onClick={() => setMenuOpen(true)}
               aria-expanded={menuOpen}
               aria-controls="prime-menu"
-              className="group -ms-2 inline-flex items-center gap-3 p-2 text-[11px] font-medium uppercase tracking-[0.28em]"
+              className="group -ms-2 inline-flex min-h-[44px] min-w-[44px] items-center gap-3 p-2 text-[11px] font-medium uppercase tracking-[0.28em]"
             >
               <MenuIcon />
               <span className="hidden sm:inline">{t('nav.menu')}</span>
@@ -206,6 +205,7 @@ export default function Header({ overHero = false }) {
             >
               {locale === 'en' ? 'عربي' : 'EN'}
             </button>
+            <ThemeToggle />
             <Link
               to="/wishlist"
               className="relative inline-flex p-2 opacity-85 transition-opacity hover:opacity-100"
@@ -213,7 +213,7 @@ export default function Header({ overHero = false }) {
             >
               <Heart size={18} strokeWidth={1.5} />
               {ids.length ? (
-                <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-prime-gold px-1 text-[9px] font-semibold text-[#221f20]">
+                <span className="absolute end-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-prime-gold px-1 text-[11px] font-semibold text-[#221f20]">
                   {ids.length}
                 </span>
               ) : null}
@@ -306,12 +306,9 @@ export default function Header({ overHero = false }) {
                     <ArrowUpRight size={13} />
                   </Link>
                 </div>
-                <div className="flex items-center gap-5">
-                  <button type="button" onClick={toggleLocale} className="transition hover:text-white">
-                    {locale === 'en' ? 'عربي' : 'English'}
-                  </button>
-                  <ThemeToggle />
-                </div>
+                <button type="button" onClick={toggleLocale} className="transition hover:text-white">
+                  {locale === 'en' ? 'عربي' : 'English'}
+                </button>
               </div>
             </div>
           </div>

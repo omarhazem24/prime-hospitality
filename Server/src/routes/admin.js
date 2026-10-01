@@ -18,6 +18,7 @@ const {
   deleteCompound,
   reorderCompounds,
   listUnits,
+  findUnit,
   createUnit,
   updateUnit,
   deleteUnit,
@@ -301,6 +302,29 @@ router.delete(
 );
 
 /* ——— Units (Google Drive galleries) ——— */
+
+/**
+ * When a Drive folder link is saved without photos, load them from the folder so the unit
+ * can pass the completeness check. Never blocks the save — returns a warning instead.
+ */
+async function fillDrivePhotos(body, current = null) {
+  const url = String(body.driveFolderUrl ?? current?.driveFolderUrl ?? '').trim();
+  const currentImages = current?.images || [];
+  const images = Array.isArray(body.images) ? body.images : currentImages;
+  const folderChanged = body.driveFolderUrl !== undefined && url !== String(current?.driveFolderUrl || '').trim();
+  // Photos picked in this save (e.g. "Load photos" in the editor) win over an automatic reload
+  const freshPhotos = images.length && JSON.stringify(images) !== JSON.stringify(currentImages);
+  if (!url || freshPhotos || (images.length && !folderChanged)) return null;
+  try {
+    const { listFolderImages } = require('../lib/googleDrive');
+    const urls = (await listFolderImages(url)).urls || [];
+    if (!urls.length) return 'The Google Drive folder has no photos (or is not shared publicly).';
+    body.images = urls;
+    return null;
+  } catch (err) {
+    return `Could not load photos from the Drive folder: ${err.message}`;
+  }
+}
 router.get(
   '/units',
   requireAdmin,
@@ -323,10 +347,11 @@ router.post(
   wrap(async (req, res) => {
     const body = req.body || {};
     if (!body.title) return res.status(400).json({ error: 'title is required' });
+    const photoWarning = await fillDrivePhotos(body);
     const item = await createUnit(body);
     const sync = require('../services/kwentraSync');
     const kw = await sync.pushUnitEdit(item);
-    res.status(201).json({ item, kwentra: kw });
+    res.status(201).json({ item, kwentra: kw, photoWarning });
   })
 );
 
@@ -377,9 +402,13 @@ router.patch(
   requireAdmin,
   wrap(async (req, res) => {
     const sync = require('../services/kwentraSync');
-    const result = await sync.saveUnitWithSync(req.params.id, req.body || {});
+    const body = req.body || {};
+    const current = await findUnit(req.params.id);
+    if (!current) return res.status(404).json({ error: 'Unit not found' });
+    const photoWarning = await fillDrivePhotos(body, current);
+    const result = await sync.saveUnitWithSync(req.params.id, body);
     if (!result.unit) return res.status(404).json({ error: 'Unit not found' });
-    res.json({ item: result.unit, kwentra: result.kwentra });
+    res.json({ item: result.unit, kwentra: result.kwentra, photoWarning });
   })
 );
 
@@ -406,46 +435,6 @@ router.post(
   wrap(async (_req, res) => {
     const report = await require('../services/kwentraSync').syncFromKwentra();
     res.status(report.reason === 'not_configured' ? 503 : 200).json(report);
-  })
-);
-
-/* ——— Inventory spreadsheet import (property fact sheets) ——— */
-const sheetUpload = require('multer')({
-  storage: require('multer').memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-  fileFilter: (_req, file, cb) => {
-    const ok = /\.xlsx$/i.test(file.originalname || '');
-    cb(ok ? null : Object.assign(new Error('Upload an .xlsx file'), { status: 400 }), ok);
-  },
-});
-
-router.post(
-  '/import/inventory',
-  requireAdmin,
-  sheetUpload.single('file'),
-  wrap(async (req, res) => {
-    const buf = req.file?.buffer;
-    // .xlsx files are zip archives ("PK")
-    if (!buf || buf[0] !== 0x50 || buf[1] !== 0x4b) {
-      return res.status(400).json({ error: 'Upload the inventory workbook as an .xlsx file' });
-    }
-    const { parseInventoryWorkbook } = require('../lib/inventorySheet');
-    const { importInventory } = require('../services/inventoryImport');
-    let parsed;
-    try {
-      parsed = await parseInventoryWorkbook(buf);
-    } catch {
-      return res.status(400).json({ error: 'Could not read that workbook — save it as .xlsx and try again' });
-    }
-    if (!parsed.properties.length) {
-      return res.status(400).json({ error: 'No property rows found in the workbook', warnings: parsed.warnings });
-    }
-    const apply = req.query.apply === '1' || req.query.apply === 'true';
-    const report = await importInventory(parsed, {
-      dryRun: !apply,
-      destinationId: String(req.query.destinationId || req.body?.destinationId || ''),
-    });
-    res.json({ ...report, parsed: parsed.properties });
   })
 );
 

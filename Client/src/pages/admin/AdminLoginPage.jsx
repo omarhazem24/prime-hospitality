@@ -30,7 +30,7 @@ export default function AdminLoginPage() {
         onSubmit={onSubmit}
         className="w-full max-w-md border border-white/15 bg-prime-surface/5 p-8 backdrop-blur-md"
       >
-        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-prime-gold">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-prime-gold">
           Prime Hospitality · Staff only
         </p>
         <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.02em] text-white">
@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
         </p>
 
         <label className="mt-8 block">
-          <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
             Email
           </span>
           <input
@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
           />
         </label>
         <label className="mt-4 block">
-          <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-white/50">
             Password
           </span>
           <input
@@ -76,7 +76,7 @@ export default function AdminLoginPage() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <Link to="/" className="mt-4 block text-center text-xs text-white/50 hover:text-white">
+        <Link to="/" className="mt-2 block py-3 text-center text-xs text-white/50 hover:text-white">
           ← Back to site
         </Link>
       </form>

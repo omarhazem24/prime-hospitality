@@ -36,7 +36,7 @@ function useSummaryRows({ stay, plan, planName, config }) {
 function Crumbs({ listing, className }) {
   const parts = [listing.destination || listing.region, listing.compound].filter(Boolean);
   return (
-    <p className={cn('flex flex-wrap items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.2em]', className)}>
+    <p className={cn('flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.2em]', className)}>
       {parts.map((p, i) => (
         <span key={p} className="inline-flex items-center gap-1">
           {i > 0 && <ChevronRight size={11} className="opacity-60 rtl:rotate-180" aria-hidden />}
@@ -55,7 +55,7 @@ function Total({ price, currency, tone = 'dark' }) {
     <div>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className={cn('text-[10px] font-semibold uppercase tracking-[0.2em]', muted)}>{t('bm.total')}</p>
+          <p className={cn('text-[11px] font-semibold uppercase tracking-[0.2em]', muted)}>{t('bm.total')}</p>
           <p className={cn('mt-1 text-xs', muted)}>
             {t('bm.avgNight', { amount: formatMoney(price.averageNightlyRate, currency) })}
           </p>
@@ -91,7 +91,7 @@ export function SummaryPanel({ listing, stay, plan, planName, price, config, cla
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-prime-night via-prime-night/45 to-black/10" />
         {listing.brand && (
-          <span className="absolute start-5 top-5 border border-white/35 bg-black/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
+          <span className="absolute start-5 top-5 border border-white/35 bg-black/25 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
             Prime {listing.brand}
           </span>
         )}
@@ -175,7 +175,7 @@ export function MobileSummary({ listing, stay, plan, planName, price, config, cl
               {formatMoney(price.rateAmount, listing.currency)}
             </span>
           ) : null}
-          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-prime-muted">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-prime-muted">
             {t('bm.summary')}
             <ChevronDown size={12} className={cn('transition', open && 'rotate-180')} aria-hidden />
           </span>

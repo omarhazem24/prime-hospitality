@@ -66,10 +66,10 @@ export default function Footer() {
           <div>
             <img src={brand.logoLight} alt={brand.name} width="640" height="228" loading="lazy" className="h-12 w-auto" />
             <address className="mt-8 space-y-2 text-[15px] font-light not-italic leading-relaxed text-white/60">
-              <a href={`mailto:${brand.email}`} className="block transition hover:text-white">
+              <a href={`mailto:${brand.email}`} className="prime-tap block transition hover:text-white">
                 {brand.email}
               </a>
-              <a href={`tel:${brand.phone || brand.whatsapp}`} className="block transition hover:text-white">
+              <a href={`tel:${brand.phone || brand.whatsapp}`} className="prime-tap block transition hover:text-white">
                 {brand.phoneDisplay}
               </a>
               <p>{brand.address}</p>
@@ -82,7 +82,7 @@ export default function Footer() {
               <ul className="mt-6 space-y-3.5">
                 {col.links.map((l) => (
                   <li key={l.to}>
-                    <Link to={l.to} className="text-[15px] font-light text-white/65 transition hover:text-white">
+                    <Link to={l.to} className="prime-tap text-[15px] font-light text-white/65 transition hover:text-white">
                       {t(l.key)}
                     </Link>
                   </li>

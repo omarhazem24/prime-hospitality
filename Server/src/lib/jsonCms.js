@@ -17,6 +17,7 @@ const {
 const { brandFromName } = require('../data/inventory');
 const { COMPOUND_FIELDS, UNIT_FIELDS, applyFields, defaults, syncCoords } = require('./fields');
 const { normalizeSite, mergeSite, sanitizeContentLists } = require('./siteContent');
+const { isLive } = require('./unitCompleteness');
 
 const STORE_PATH = path.join(__dirname, '../../data/cms-store.json');
 const STORE_VERSION = 2;
@@ -184,8 +185,15 @@ function linkUnit(unit, compounds) {
 
 function refreshCounts(store) {
   for (const c of store.compounds) {
-    c.unitCount = store.units.filter((u) => u.compoundId === c.id && u.published !== false).length;
+    c.unitCount = store.units.filter((u) => u.compoundId === c.id && isLive(u)).length;
   }
+}
+
+function recountUnits() {
+  const store = readStore();
+  const before = store.compounds.map((c) => c.unitCount);
+  refreshCounts(store);
+  if (store.compounds.some((c, i) => c.unitCount !== before[i])) writeStore(store);
 }
 
 async function getDashboard() {
@@ -660,6 +668,7 @@ async function findBooking(id) {
 module.exports = {
   STORE_PATH,
   ensureStore,
+  recountUnits,
   sortBy,
   slugify,
   newId,

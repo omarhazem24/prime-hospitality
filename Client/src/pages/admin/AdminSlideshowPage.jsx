@@ -109,7 +109,7 @@ export default function AdminSlideshowPage() {
               }}
             />
             <label className="mt-4 block">
-              <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
+              <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.18em] text-prime-muted">
                 Alt text
               </span>
               <input

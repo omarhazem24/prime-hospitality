@@ -529,6 +529,7 @@ async function quoteStay() {
 module.exports = {
   isConfigured,
   getTenantId,
+  baseUrl,
   kwentraFetch,
   listReservations,
   getGuestProfile,

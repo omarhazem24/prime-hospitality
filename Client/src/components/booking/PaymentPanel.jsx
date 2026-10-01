@@ -59,7 +59,7 @@ export default function PaymentPanel({ payment, booking, amount, currency = 'EGP
   return (
     <div className="border border-prime-line">
       <div className="flex items-center justify-between gap-3 border-b border-prime-line bg-prime-mist/60 px-4 py-3">
-        <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-prime-muted">
+        <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-prime-muted">
           <Lock size={13} strokeWidth={2} aria-hidden />
           {t('bm.securePayment')}
         </span>

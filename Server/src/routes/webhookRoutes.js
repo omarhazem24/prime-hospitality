@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { Router } = require('express');
 const payment = require('../services/paymentService');
 const kwentra = require('../services/kwentraService');
@@ -71,9 +72,27 @@ router.post('/stripe', async (req, res, next) => {
   }
 });
 
-router.post('/kwentra', async (req, res) => {
-  console.log('[webhook/kwentra]', JSON.stringify(req.body)?.slice(0, 500));
-  res.json({ received: true });
+function kwentraSecretOk(req) {
+  const expected = process.env.KWENTRA_WEBHOOK_SECRET;
+  if (!expected) return true;
+  const given = String(
+    req.headers['x-kwentra-secret'] || req.headers['x-webhook-secret'] || req.query.secret || req.query.token || ''
+  );
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Kwentra calls this whenever inventory changes (room type / room / property / destination
+ * created, updated or deleted). The website pulls the fresh data straight away.
+ */
+router.post('/kwentra', (req, res) => {
+  if (!kwentraSecretOk(req)) return res.status(401).json({ error: 'Invalid webhook secret' });
+  const body = req.body || {};
+  const event = String(body.event || body.type || body.action || body.model || 'change');
+  console.log('[webhook/kwentra]', event, JSON.stringify(body).slice(0, 300));
+  res.status(202).json({ received: true, event, sync: sync.requestSync(`kwentra webhook: ${event}`) });
 });
 
 module.exports = router;

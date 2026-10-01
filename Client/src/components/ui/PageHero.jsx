@@ -10,7 +10,7 @@ export default function PageHero({ eyebrow, title, lede, image, align = 'start',
 
   if (image) {
     return (
-      <section className={cn('relative isolate flex min-h-[72svh] items-end overflow-hidden bg-[#221f20] text-white md:min-h-[78svh]', className)}>
+      <section className={cn('relative isolate flex min-h-vh-72 items-end overflow-hidden bg-[#221f20] text-white md:min-h-vh-78', className)}>
         <Img
           src={image}
           alt=""

@@ -7,9 +7,13 @@ import { Badge, ConfirmDialog, EmptyState, SearchInput, StatusChips, Tabs, useTo
 import UnitEditor, { kwentraMessage } from '../../components/admin/UnitEditor';
 import { cn } from '../../utils/cn';
 
+const isComplete = (u) => u.completeness?.complete !== false;
+const missingLabels = (u) => (u.completeness?.missing || []).map((m) => m.label);
+
 const STATUS = {
   all: () => true,
-  published: (u) => u.published !== false,
+  live: (u) => u.published !== false && isComplete(u),
+  incomplete: (u) => !isComplete(u),
   hidden: (u) => u.published === false,
   featured: (u) => u.featured,
   linked: (u) => Boolean(u.kwentraRoomTypeId),
@@ -18,7 +22,8 @@ const STATUS = {
 
 const STATUS_LABELS = [
   ['all', 'All'],
-  ['published', 'Published'],
+  ['live', 'Live'],
+  ['incomplete', 'Incomplete'],
   ['hidden', 'Hidden'],
   ['featured', 'Featured'],
   ['linked', 'Kwentra'],
@@ -135,9 +140,13 @@ export default function AdminUnitsPage() {
     }
   }
 
-  async function onSaved(_item, kw) {
+  async function onSaved(item, kw, photoWarning) {
     const [tone, message] = kwentraMessage(kw);
     toast[tone](message);
+    if (photoWarning) toast.error(photoWarning);
+    if (item && item.completeness?.complete === false) {
+      toast.error(`Saved, but hidden from guests until filled: ${missingLabels(item).join(', ')}.`);
+    }
     setEditor({ open: false, unit: null });
     await load();
   }
@@ -158,11 +167,11 @@ export default function AdminUnitsPage() {
     <div>
       <AdminPageHeader
         title="Unit types"
-        lede={`${items.length} unit types · ${items.filter((u) => u.published !== false).length} published. Details come from Kwentra; photos, visibility and ordering are website-only.`}
+        lede={`${items.length} unit types · ${items.filter(STATUS.live).length} live · ${items.filter(STATUS.incomplete).length} incomplete (hidden until every field is filled). Details come from Kwentra; photos, visibility and ordering are website-only.`}
         actions={
           <div className="flex flex-wrap gap-2">
             <Link to="/admin/sync" className="prime-btn-outline">
-              <RefreshCw size={14} /> Import & sync
+              <RefreshCw size={14} /> Kwentra sync
             </Link>
             <button type="button" className="prime-btn" onClick={() => setEditor({ open: true, unit: null })}>
               <Plus size={14} /> Add unit type
@@ -263,7 +272,7 @@ export default function AdminUnitsPage() {
           ) : filtered.length ? (
             <div className="overflow-x-auto border border-prime-line bg-prime-surface">
               <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b border-prime-line text-[10px] uppercase tracking-[0.16em] text-prime-muted">
+                <thead className="border-b border-prime-line text-[11px] uppercase tracking-[0.16em] text-prime-muted">
                   <tr>
                     <th className="w-10 px-3 py-3">
                       {view === 'order' ? null : <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />}
@@ -321,11 +330,17 @@ export default function AdminUnitsPage() {
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1">
                             <button type="button" onClick={() => quickToggle(u, { published: u.published === false })} title="Toggle visibility">
-                              <Badge tone={u.published === false ? 'gray' : 'green'}>{u.published === false ? 'Hidden' : 'Published'}</Badge>
+                              <Badge tone={u.published === false ? 'gray' : isComplete(u) ? 'green' : 'gray'}>
+                                {u.published === false ? 'Hidden' : isComplete(u) ? 'Live' : 'Published'}
+                              </Badge>
                             </button>
+                            {!isComplete(u) ? (
+                              <button type="button" onClick={() => setEditor({ open: true, unit: u })} title={`Missing: ${missingLabels(u).join(', ')}`}>
+                                <Badge tone="red">Incomplete · {missingLabels(u).length} missing</Badge>
+                              </button>
+                            ) : null}
                             {u.featured ? <Badge tone="gold">Featured</Badge> : null}
                             {u.kwentraRoomTypeId ? <Badge tone="blue">Kwentra #{u.kwentraRoomTypeId}</Badge> : <Badge>Website only</Badge>}
-                            {!u.images?.length ? <Badge tone="red">No photos</Badge> : null}
                           </div>
                         </td>
                         <td className="px-3 py-3 text-end">
@@ -348,7 +363,7 @@ export default function AdminUnitsPage() {
             <EmptyState
               icon={Home}
               title={items.length ? 'No unit types match' : 'No unit types yet'}
-              subtitle={items.length ? 'Try another filter or search.' : 'Sync from Kwentra, import a fact sheet, or add one by hand.'}
+              subtitle={items.length ? 'Try another filter or search.' : 'Add units in Kwentra and they appear here automatically, or add one by hand.'}
               action={
                 <button type="button" className="prime-btn" onClick={() => setEditor({ open: true, unit: null })}>
                   <Plus size={14} /> Add unit type

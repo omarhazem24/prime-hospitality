@@ -66,7 +66,7 @@ export default function BookingSuccessPage() {
 
         {voucher && (
           <div className="mt-12 border-y border-prime-line py-8 text-center">
-            <p className="text-[10.5px] font-medium uppercase tracking-[0.3em] text-prime-muted">{t('bs.voucher')}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.3em] text-prime-muted">{t('bs.voucher')}</p>
             <p className="mt-3 font-display text-[2.4rem] font-medium tracking-[0.04em] text-prime-ink md:text-[3rem]">{voucher}</p>
           </div>
         )}
@@ -88,7 +88,7 @@ export default function BookingSuccessPage() {
                 ))}
               </dl>
               <div className="flex items-baseline justify-between gap-4 border-t border-prime-line bg-prime-mist/60 px-6 py-5 md:px-8">
-                <span className="text-[10.5px] font-medium uppercase tracking-[0.26em] text-prime-muted">{t('bs.paid')}</span>
+                <span className="text-[11px] font-medium uppercase tracking-[0.26em] text-prime-muted">{t('bs.paid')}</span>
                 <span className="font-display text-[2rem] font-medium tabular-nums text-prime-ink">
                   {formatMoney(booking.rateAmount, booking.rateCurrency)}
                 </span>

@@ -51,7 +51,7 @@ export default function ContactPage() {
             {channels.map((c) => {
               const inner = (
                 <>
-                  <span className="text-[10.5px] font-medium uppercase tracking-[0.28em] text-prime-muted">{c.label}</span>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.28em] text-prime-muted">{c.label}</span>
                   <span className="mt-2 flex items-center justify-between gap-4 font-display text-[1.45rem] font-medium text-prime-ink sm:text-[1.6rem]">
                     <span className="min-w-0 [overflow-wrap:anywhere]">{c.value}</span>
                     {c.href ? (

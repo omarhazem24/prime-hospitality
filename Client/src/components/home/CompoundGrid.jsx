@@ -31,7 +31,7 @@ function DestinationTile({ destination, index, meta, lead }) {
           {destination.name}
         </h3>
         {meta ? <p className="mt-3 text-[12px] font-light tracking-[0.06em] text-white/70">{meta}</p> : null}
-        <span className="mt-5 inline-flex items-center gap-3 text-[10.5px] font-medium uppercase tracking-[0.28em] text-white/90">
+        <span className="mt-5 inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.28em] text-white/90">
           Discover
           <span className="h-px w-6 bg-prime-gold transition-all duration-500 ease-prime group-hover:w-12" />
         </span>
